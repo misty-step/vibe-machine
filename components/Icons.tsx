@@ -1,0 +1,47 @@
+import React from 'react';
+import { 
+  Play, 
+  Pause, 
+  SkipForward, 
+  SkipBack, 
+  Upload, 
+  Music, 
+  Image as ImageIcon,
+  Settings,
+  Download,
+  Trash2,
+  MoveVertical,
+  Activity,
+  Circle,
+  Monitor,
+  Smartphone,
+  Square,
+  Video,
+  Disc,
+  Maximize2,
+  ChevronDown
+} from 'lucide-react';
+
+export const Icons = {
+  Play,
+  Pause,
+  SkipForward,
+  SkipBack,
+  Upload,
+  Music,
+  Image: ImageIcon,
+  Settings,
+  Download,
+  Trash: Trash2,
+  DragHandle: MoveVertical,
+  Wave: Activity,
+  Activity,
+  Circle,
+  Monitor,
+  Smartphone,
+  Square,
+  Video,
+  Disc,
+  Maximize: Maximize2,
+  ChevronDown
+};
