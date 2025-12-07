@@ -1,18 +1,37 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Icons } from './components/Icons';
 import Visualizer from './components/Visualizer';
-import { Track, VibeSettings, VisualizerMode, AspectRatio, PRESET_COLORS, FontFamily, FontSize } from './types';
-import { formatTime, generateId, getAudioDuration } from './utils';
+import { VibeSettings, VisualizerMode, AspectRatio, PRESET_COLORS, FontFamily, FontSize } from './types';
+import { formatTime } from './utils';
+import { useAudioEngine } from './hooks/useAudioEngine';
+import { VideoRenderer } from './components/VideoRenderer';
 
 const App: React.FC = () => {
-  // --- State ---
-  const [playlist, setPlaylist] = useState<Track[]>([]);
-  const [currentTrackIndex, setCurrentTrackIndex] = useState<number>(0);
-  const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const [currentTime, setCurrentTime] = useState<number>(0);
-  const [duration, setDuration] = useState<number>(0);
+  // --- Audio Engine ---
+  const {
+    playlist,
+    currentTrackIndex,
+    currentTrack,
+    isPlaying,
+    currentTime,
+    duration,
+    analyser,
+    addTracks,
+    removeTrack,
+    updateTrackInfo,
+    playPause,
+    selectTrack,
+    nextTrack,
+    prevTrack,
+    audioElRef
+  } = useAudioEngine();
+
+  // --- UI State ---
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'media' | 'style' | 'export'>('media');
+  const [exportProgress, setExportProgress] = useState<number>(0);
+  const [exportStatus, setExportStatus] = useState<string>("");
+  const [isExporting, setIsExporting] = useState<boolean>(false);
   
   // Settings
   const [settings, setSettings] = useState<VibeSettings>({
@@ -28,36 +47,7 @@ const App: React.FC = () => {
     visualizerIntensity: 1.0
   });
 
-  // --- Audio Refs ---
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const audioSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const gainNodeRef = useRef<GainNode | null>(null);
-  const audioElRef = useRef<HTMLAudioElement | null>(null);
-  
-  // Lock to prevent rapid track changes breaking fades
-  const isTransitioning = useRef<boolean>(false);
-  
   const [isCinemaMode, setIsCinemaMode] = useState<boolean>(false);
-
-  // --- Audio Initialization ---
-  const initAudio = () => {
-    if (!audioContextRef.current) {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      audioContextRef.current = new AudioCtx();
-      
-      // Create Nodes
-      analyserRef.current = audioContextRef.current.createAnalyser();
-      gainNodeRef.current = audioContextRef.current.createGain();
-      
-      // Configure
-      analyserRef.current.fftSize = 2048; 
-      analyserRef.current.smoothingTimeConstant = 0.9;
-      
-      // Initial Gain
-      gainNodeRef.current.gain.value = 1.0;
-    }
-  };
 
   // --- Handlers ---
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'audio' | 'image') => {
@@ -67,162 +57,14 @@ const App: React.FC = () => {
         const url = URL.createObjectURL(file);
         setBackgroundImage(url);
       } else {
-        const newTracks: Track[] = [];
-        for (let i = 0; i < e.target.files.length; i++) {
-          const file = e.target.files[i];
-          const duration = await getAudioDuration(file);
-          newTracks.push({
-            id: generateId(),
-            file,
-            name: file.name.replace(/\.[^/.]+$/, ""), // remove extension
-            artist: '',
-            duration
-          });
-        }
-        setPlaylist(prev => [...prev, ...newTracks]);
+        // Convert FileList to Array
+        const files = Array.from(e.target.files) as File[];
+        await addTracks(files);
       }
     }
     // Reset input
     e.target.value = '';
   };
-
-  // Intelligent Track Selection (with Fades)
-  const handleTrackSelect = async (index: number) => {
-    if (index < 0 || index >= playlist.length) return;
-    if (index === currentTrackIndex) return;
-    if (isTransitioning.current) return;
-
-    if (isPlaying && audioContextRef.current && gainNodeRef.current) {
-      // 1. FADE OUT
-      isTransitioning.current = true;
-      const ctx = audioContextRef.current;
-      const gain = gainNodeRef.current;
-      const now = ctx.currentTime;
-      
-      // Ramp to 0 over 500ms
-      gain.gain.cancelScheduledValues(now);
-      gain.gain.setValueAtTime(gain.gain.value, now);
-      gain.gain.linearRampToValueAtTime(0, now + 0.5);
-
-      // Wait for fade
-      setTimeout(() => {
-        setCurrentTrackIndex(index);
-        // Playback handling is in useEffect
-        isTransitioning.current = false;
-      }, 550);
-
-    } else {
-      // Just switch if paused or not init
-      setCurrentTrackIndex(index);
-    }
-  };
-
-  const togglePlay = async () => {
-    if (!audioContextRef.current) initAudio();
-    if (audioContextRef.current?.state === 'suspended') {
-      await audioContextRef.current.resume();
-    }
-
-    if (audioElRef.current) {
-      if (isPlaying) {
-        // Fade Out on Pause? Optional. Let's just pause for snappy response.
-        audioElRef.current.pause();
-      } else {
-        // Ensure volume is up
-        if (gainNodeRef.current && audioContextRef.current) {
-             gainNodeRef.current.gain.cancelScheduledValues(audioContextRef.current.currentTime);
-             gainNodeRef.current.gain.setValueAtTime(1, audioContextRef.current.currentTime);
-        }
-        audioElRef.current.play().catch(e => console.error("Playback error:", e));
-      }
-      setIsPlaying(!isPlaying);
-    }
-  };
-
-  const updateTrackInfo = (id: string, field: 'name' | 'artist', value: string) => {
-    setPlaylist(prev => prev.map(t => t.id === id ? { ...t, [field]: value } : t));
-  };
-
-  const removeTrack = (id: string) => {
-    setPlaylist(prev => prev.filter(t => t.id !== id));
-  };
-
-  // --- Effects ---
-  
-  // Connect Audio Element to Web Audio API (Once)
-  useEffect(() => {
-    if (audioElRef.current && !audioSourceRef.current && audioContextRef.current && analyserRef.current && gainNodeRef.current) {
-      try {
-        audioSourceRef.current = audioContextRef.current.createMediaElementSource(audioElRef.current);
-        // Chain: Source -> Analyser -> Gain -> Destination
-        // This ensures visuals keep working during fade out
-        audioSourceRef.current.connect(analyserRef.current);
-        analyserRef.current.connect(gainNodeRef.current);
-        gainNodeRef.current.connect(audioContextRef.current.destination);
-      } catch (e) {
-        console.warn("Media element source already connected or error", e);
-      }
-    }
-  }, [isPlaying]); 
-
-  // Handle Track Source Change
-  useEffect(() => {
-    if (playlist.length > 0 && audioElRef.current) {
-      const track = playlist[currentTrackIndex];
-      const url = URL.createObjectURL(track.file);
-      const prevSrc = audioElRef.current.src;
-      
-      audioElRef.current.src = url;
-      setDuration(track.duration);
-      
-      if (isPlaying) {
-        audioElRef.current.play().then(() => {
-            // 2. FADE IN
-            if (audioContextRef.current && gainNodeRef.current) {
-                const ctx = audioContextRef.current;
-                const gain = gainNodeRef.current;
-                const now = ctx.currentTime;
-                
-                // Reset to 0 (silence) then ramp up
-                gain.gain.cancelScheduledValues(now);
-                gain.gain.setValueAtTime(0, now);
-                gain.gain.linearRampToValueAtTime(1, now + 0.5);
-            }
-        });
-      }
-
-      return () => {
-        URL.revokeObjectURL(url);
-      };
-    }
-  }, [currentTrackIndex, playlist]); // Removed isPlaying from dependency to avoid re-trigger
-
-  // Time Update Loop
-  useEffect(() => {
-    const el = audioElRef.current;
-    if (!el) return;
-
-    const handleTimeUpdate = () => setCurrentTime(el.currentTime);
-    
-    const handleEnded = () => {
-       if (currentTrackIndex < playlist.length - 1) {
-         // Auto advance: Use a small delay for vibe
-         setTimeout(() => {
-             handleTrackSelect(currentTrackIndex + 1);
-         }, 1000);
-       } else {
-         setIsPlaying(false);
-         setCurrentTrackIndex(0);
-       }
-    };
-
-    el.addEventListener('timeupdate', handleTimeUpdate);
-    el.addEventListener('ended', handleEnded);
-    return () => {
-      el.removeEventListener('timeupdate', handleTimeUpdate);
-      el.removeEventListener('ended', handleEnded);
-    };
-  }, [currentTrackIndex, playlist.length]);
 
   // Keyboard Shortcuts
   useEffect(() => {
@@ -230,10 +72,15 @@ const App: React.FC = () => {
         if (e.key === 'Escape') {
             setIsCinemaMode(false);
         }
+        if (e.code === 'Space') {
+            // Prevent scrolling
+            e.preventDefault();
+            playPause();
+        }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [playPause]); // Added playPause dependency
 
   const randomizeVibe = () => {
       const randomColor = PRESET_COLORS[Math.floor(Math.random() * PRESET_COLORS.length)];
@@ -247,29 +94,63 @@ const App: React.FC = () => {
       }));
   };
 
-  // Export Logic (Simulation)
-  const handleExport = () => {
-    const btn = document.getElementById('export-btn');
-    if(btn) {
-        const originalText = btn.innerText;
-        btn.innerText = "Rendering... (Simulated)";
-        (btn as HTMLButtonElement).disabled = true;
-        
-        setTimeout(() => {
-            btn.innerText = "Downloaded!";
-            // Simulate download
-            const link = document.createElement('a');
-            link.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent("This is a placeholder for the exported video file. Real video encoding requires ffmpeg.wasm which is too heavy for this demo.");
-            link.download = "vibe_machine_export_manifest.txt";
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+  // Export Logic
+  const handleExport = async () => {
+    if (playlist.length === 0) {
+        alert("Please add at least one audio track to export.");
+        return;
+    }
 
-            setTimeout(() => {
-                btn.innerText = originalText;
-                (btn as HTMLButtonElement).disabled = false;
-            }, 2000);
+    try {
+        setIsExporting(true);
+        setExportProgress(0);
+        setExportStatus("Initializing...");
+
+        const renderer = new VideoRenderer();
+        
+        // Determine resolution based on aspect ratio
+        let width = 1920;
+        let height = 1080;
+        if (settings.aspectRatio === AspectRatio.OneOne) { width = 1080; height = 1080; }
+        else if (settings.aspectRatio === AspectRatio.NineSixteen) { width = 1080; height = 1920; }
+
+        const blob = await renderer.renderProject(
+            playlist,
+            settings,
+            backgroundImage,
+            {
+                width,
+                height,
+                fps: 30,
+                bitrate: 6_000_000 // 6 Mbps
+            },
+            (progress, status) => {
+                setExportProgress(Math.min(100, Math.round(progress * 100)));
+                setExportStatus(status);
+            }
+        );
+
+        // Download
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = "vibe_export.mp4";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        setExportStatus("Done!");
+        setTimeout(() => {
+             setIsExporting(false);
+             setExportProgress(0);
         }, 3000);
+
+    } catch (error) {
+        console.error("Export failed:", error);
+        setExportStatus("Error: " + (error as Error).message);
+        alert("Export failed. Check console for details.");
+        setIsExporting(false);
     }
   };
 
@@ -391,7 +272,7 @@ const App: React.FC = () => {
                             className={`flex items-center p-2 rounded border transition-all duration-200 group ${currentTrackIndex === idx ? 'bg-amber-500/10 border-amber-500/40 shadow-[0_0_10px_rgba(245,158,11,0.1)]' : 'bg-transparent border-transparent hover:bg-white/5 hover:border-white/5'}`}
                         >
                             <button 
-                                onClick={() => handleTrackSelect(idx)}
+                                onClick={() => selectTrack(idx)}
                                 className={`w-8 h-8 rounded flex items-center justify-center transition-colors shrink-0 mr-3 ${currentTrackIndex === idx && isPlaying ? 'text-amber-400' : 'text-zinc-600 group-hover:text-zinc-300'}`}
                             >
                                 {currentTrackIndex === idx && isPlaying ? <Icons.Pause className="w-3.5 h-3.5 fill-current" /> : <Icons.Play className="w-3.5 h-3.5 fill-current" />}
@@ -582,39 +463,64 @@ const App: React.FC = () => {
 
             {/* EXPORT TAB */}
             {activeTab === 'export' && (
-              <div className="h-full flex flex-col justify-center items-center text-center space-y-6">
+              <div className="h-full flex flex-col justify-center items-center text-center space-y-6 p-4">
                  <div className="w-16 h-16 bg-zinc-900 rounded-2xl flex items-center justify-center mb-2 border border-zinc-800">
                      <Icons.Download className="w-8 h-8 text-zinc-500" />
                  </div>
                  <div>
                      <h3 className="text-lg font-medium text-white">Ready to Render?</h3>
-                     <p className="text-sm text-zinc-500 mt-2 max-w-[240px] mx-auto">This will compile your visuals and audio into a shareable format.</p>
+                     <p className="text-sm text-zinc-500 mt-2 max-w-[240px] mx-auto">
+                        {isExporting 
+                            ? "Sit back. This happens locally on your device." 
+                            : "This will compile your visuals and audio into a shareable format."}
+                     </p>
                  </div>
                  
-                 <div className="w-full bg-zinc-900/50 rounded-lg p-4 text-left text-sm space-y-2 border border-zinc-800/50">
-                     <div className="flex justify-between">
-                         <span className="text-zinc-500">Resolution</span>
-                         <span className="text-zinc-300">1080p (HQ)</span>
+                 {!isExporting && (
+                     <div className="w-full bg-zinc-900/50 rounded-lg p-4 text-left text-sm space-y-2 border border-zinc-800/50">
+                         <div className="flex justify-between">
+                             <span className="text-zinc-500">Resolution</span>
+                             <span className="text-zinc-300">
+                                {settings.aspectRatio === AspectRatio.SixteenNine ? '1920x1080' : 
+                                 settings.aspectRatio === AspectRatio.OneOne ? '1080x1080' : '1080x1920'}
+                             </span>
+                         </div>
+                         <div className="flex justify-between">
+                             <span className="text-zinc-500">Duration</span>
+                             <span className="text-zinc-300">{formatTime(playlist.reduce((acc, t) => acc + t.duration, 0))}</span>
+                         </div>
+                         <div className="flex justify-between">
+                             <span className="text-zinc-500">FPS</span>
+                             <span className="text-zinc-300">30</span>
+                         </div>
                      </div>
-                     <div className="flex justify-between">
-                         <span className="text-zinc-500">Duration</span>
-                         <span className="text-zinc-300">{formatTime(playlist.reduce((acc, t) => acc + t.duration, 0))}</span>
+                 )}
+
+                 {isExporting && (
+                     <div className="w-full space-y-2 animate-in fade-in">
+                         <div className="flex justify-between text-xs font-mono text-zinc-400 uppercase">
+                             <span>{exportStatus}</span>
+                             <span>{exportProgress}%</span>
+                         </div>
+                         <div className="h-2 bg-zinc-900 rounded-full overflow-hidden border border-zinc-800">
+                             <div 
+                                className="h-full bg-amber-500 transition-all duration-300 ease-out"
+                                style={{ width: `${exportProgress}%` }}
+                             ></div>
+                         </div>
                      </div>
-                     <div className="flex justify-between">
-                         <span className="text-zinc-500">FPS</span>
-                         <span className="text-zinc-300">30</span>
-                     </div>
-                 </div>
+                 )}
 
                  <button 
                     id="export-btn"
                     onClick={handleExport}
+                    disabled={isExporting || playlist.length === 0}
                     className="bg-amber-500 hover:bg-amber-400 text-black px-8 py-3 rounded-full font-bold shadow-lg shadow-amber-500/20 transition-all active:scale-95 w-full disabled:opacity-50 disabled:cursor-not-allowed"
                  >
-                     Render Video
+                     {isExporting ? 'Rendering...' : 'Render Video (MP4)'}
                  </button>
                  <p className="text-xs text-zinc-600">
-                    *Note: In-browser encoding is simulated for this demo.
+                    Uses WebCodecs + H.264. No server upload required.
                  </p>
               </div>
             )}
@@ -633,8 +539,8 @@ const App: React.FC = () => {
               <Visualizer 
                 settings={settings}
                 backgroundImage={backgroundImage}
-                analyser={analyserRef.current}
-                currentTrack={playlist[currentTrackIndex]}
+                analyser={analyser}
+                currentTrack={currentTrack}
                 currentTime={currentTime}
                 duration={duration}
                 isPlaying={isPlaying}
@@ -646,16 +552,13 @@ const App: React.FC = () => {
              
              <button 
                 className="text-zinc-400 hover:text-white transition-colors"
-                onClick={() => {
-                    const newIndex = currentTrackIndex - 1;
-                    if (newIndex >= 0) handleTrackSelect(newIndex);
-                }}
+                onClick={() => prevTrack()}
              >
                  <Icons.SkipBack className="w-5 h-5" />
              </button>
 
              <button 
-                onClick={togglePlay}
+                onClick={playPause}
                 className="w-12 h-12 bg-white rounded-full flex items-center justify-center hover:scale-105 transition-transform shadow-lg shadow-white/10"
              >
                  {isPlaying ? <Icons.Pause className="w-5 h-5 text-black fill-current" /> : <Icons.Play className="w-5 h-5 text-black fill-current translate-x-0.5" />}
@@ -663,10 +566,7 @@ const App: React.FC = () => {
 
              <button 
                 className="text-zinc-400 hover:text-white transition-colors"
-                onClick={() => {
-                    const newIndex = currentTrackIndex + 1;
-                    if (newIndex < playlist.length) handleTrackSelect(newIndex);
-                }}
+                onClick={() => nextTrack()}
              >
                  <Icons.SkipForward className="w-5 h-5" />
              </button>
@@ -675,7 +575,7 @@ const App: React.FC = () => {
              
              <div className="flex flex-col w-48">
                  <span className="text-xs font-medium text-white truncate">
-                    {playlist[currentTrackIndex]?.name || "No Track Selected"}
+                    {currentTrack?.name || "No Track Selected"}
                  </span>
                  <div className="flex items-center justify-between text-[10px] text-zinc-500 font-mono mt-1">
                      <span>{formatTime(currentTime)}</span>

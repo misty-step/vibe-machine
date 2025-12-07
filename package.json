@@ -17,6 +17,7 @@
     "@fontsource/playfair-display": "^5.2.8",
     "@fontsource/roboto-slab": "^5.2.8",
     "lucide-react": "^0.556.0",
+    "mp4-muxer": "^5.2.2",
     "react": "^19.2.1",
     "react-dom": "^19.2.1"
   },
