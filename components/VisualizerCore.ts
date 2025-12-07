@@ -1,4 +1,4 @@
-import { VibeSettings, Track, AspectRatio } from '../types';
+import { VibeSettings, Track, VisualizerMode } from '../types';
 
 // Physics Constants
 const ATTACK = 0.6;
@@ -104,7 +104,7 @@ export class VisualizerCore {
         ctx.fillRect(0, 0, width, height);
     }
 
-    // 2. Render Visualization (Bars)
+    // 2. Render Visualization
     ctx.strokeStyle = settings.visualizerColor;
     ctx.fillStyle = settings.visualizerColor;
     ctx.lineCap = 'round';
@@ -112,30 +112,89 @@ export class VisualizerCore {
     ctx.shadowBlur = 25;
     ctx.shadowColor = settings.visualizerColor;
 
-    const padding = 80;
-    const vizWidth = 600; 
-    const originX = width - padding - vizWidth;
-    const originY = height - padding;
-    
-    const visibleBars = 12; 
-    const barW = 24; 
-    const gap = 12; 
-    const maxH = 200 * settings.visualizerIntensity;
     const state = this.physicsState;
 
-    // Align to Bottom Right
-    for (let i = 0; i < visibleBars; i++) {
-        const idx = i * 2; 
-        const val = state[idx];
+    if (settings.visualizerMode === VisualizerMode.Bars) {
+        const padding = 80;
+        const vizWidth = 600; 
+        const originX = width - padding - vizWidth;
+        const originY = height - padding;
         
-        let h = Math.max(12, Math.pow(val, 1.4) * maxH);
+        const visibleBars = 12; 
+        const barW = 24; 
+        const gap = 12; 
+        const maxH = 200 * settings.visualizerIntensity;
 
-        const x = (originX + vizWidth) - ((visibleBars - i) * (barW + gap));
-        const y = originY;
+        // Align to Bottom Right
+        for (let i = 0; i < visibleBars; i++) {
+            const idx = i * 2; 
+            const val = state[idx];
+            
+            let h = Math.max(12, Math.pow(val, 1.4) * maxH);
+
+            const x = (originX + vizWidth) - ((visibleBars - i) * (barW + gap));
+            const y = originY;
+
+            ctx.beginPath();
+            ctx.roundRect(x, y - h, barW, h, 10);
+            ctx.fill();
+        }
+    } else if (settings.visualizerMode === VisualizerMode.Orbital) {
+        const cx = width / 2;
+        const cy = height / 2;
+        const radius = Math.min(width, height) * 0.25;
+        const maxBarH = 100 * settings.visualizerIntensity;
 
         ctx.beginPath();
-        ctx.roundRect(x, y - h, barW, h, 10);
+        for (let i = 0; i < 32; i++) {
+            const angle = (i / 32) * Math.PI * 2;
+            const val = state[i];
+            const h = Math.max(4, Math.pow(val, 1.2) * maxBarH);
+            
+            const x1 = cx + Math.cos(angle) * radius;
+            const y1 = cy + Math.sin(angle) * radius;
+            const x2 = cx + Math.cos(angle) * (radius + h);
+            const y2 = cy + Math.sin(angle) * (radius + h);
+
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+        }
+        ctx.lineWidth = 6;
+        ctx.stroke();
+
+        // Inner Glow
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius - 10, 0, Math.PI * 2);
+        ctx.fillStyle = `${settings.visualizerColor}20`; // Low opacity fill
         ctx.fill();
+
+    } else if (settings.visualizerMode === VisualizerMode.Wave) {
+        const centerY = height / 2;
+        const startX = 0;
+        const step = width / 32;
+        const amp = 150 * settings.visualizerIntensity;
+
+        ctx.beginPath();
+        ctx.moveTo(startX, centerY);
+
+        for (let i = 0; i < 32; i++) {
+            const x = startX + (i * step);
+            const val = state[i];
+            // Sine wave modulation based on frequency data
+            const y = centerY + Math.sin(i * 0.5 + elapsedTime * 2) * (val * amp);
+            
+            // Smooth curve
+            if (i === 0) ctx.moveTo(x, y);
+            else {
+                const prevX = startX + ((i - 1) * step);
+                const prevVal = state[i-1];
+                const prevY = centerY + Math.sin((i-1) * 0.5 + elapsedTime * 2) * (prevVal * amp);
+                const cpX = (prevX + x) / 2;
+                ctx.quadraticCurveTo(prevX, prevY, cpX, (prevY + y) / 2);
+            }
+        }
+        ctx.lineWidth = 4;
+        ctx.stroke();
     }
 
     // 3. Overlays (Text)

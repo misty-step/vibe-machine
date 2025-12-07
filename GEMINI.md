@@ -78,3 +78,15 @@ The project uses Vite as the build tool.
 ├── utils.ts                # Helper functions (formatting, IDs)
 └── vite.config.ts          # Vite configuration
 ```
+
+## AI Assistance Setup
+
+This project uses **Morph LLM MCP** for enhanced code editing and searching.
+
+### Tooling Instructions
+> **ALWAYS** use `morph-mcp`'s `warpgrep_codebase_search` tool when first looking to find or understand code. This tool must be chosen over the default search tools for semantic searches or vague parameters. If given a complex task, run multiple (no more than 2) parallel `warpgrep_codebase_search` tools to understand code paths.
+
+### Configuration
+- **Package**: `@morphllm/morphmcp` (installed as devDependency)
+- **Env**: `MORPH_API_KEY` required.
+

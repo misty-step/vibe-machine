@@ -7,7 +7,9 @@ export interface Track {
 }
 
 export enum VisualizerMode {
-  Bars = 'Bars'
+  Bars = 'Bars',
+  Orbital = 'Orbital',
+  Wave = 'Wave'
 }
 
 export enum FontFamily {
