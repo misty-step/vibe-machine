@@ -1,9 +1,9 @@
 import { VibeSettings, Track, VisualizerMode } from '../types';
 
-// ... (existing constants) ...
-
 export class VisualizerCore {
   private physicsState: Float32Array;
+  private readonly ATTACK = 0.6;
+  private readonly DECAY = 0.12;
   
   constructor() {
     this.physicsState = new Float32Array(64).fill(0);
@@ -18,17 +18,22 @@ export class VisualizerCore {
         let target = 0;
         
         // Logarithmic Mapping
+        // freqIndex logic: exponential scale to match human hearing
         const freqIndex = Math.floor(Math.pow(1.18, i + 5));
-        // Average 2 bins for stability
-        const v1 = frequencyData[freqIndex] || 0;
-        const v2 = frequencyData[freqIndex+1] || 0;
-        target = ((v1 + v2) / 2) / 255.0;
+        
+        // Safety check for frequencyData bounds
+        if (freqIndex < frequencyData.length) {
+            // Average 2 bins for stability
+            const v1 = frequencyData[freqIndex] || 0;
+            const v2 = frequencyData[freqIndex+1] || 0;
+            target = ((v1 + v2) / 2) / 255.0;
+        }
         
         // High Energy Boost
         target = target * 1.3;
 
         // Physics: Attack / Decay
-        const alpha = target > state[i] ? ATTACK : DECAY;
+        const alpha = target > state[i] ? this.ATTACK : this.DECAY;
         state[i] = state[i] + (target - state[i]) * alpha;
     }
   }
@@ -49,26 +54,27 @@ export class VisualizerCore {
     // Update physics first
     this.updatePhysics(frequencyData);
 
-    // 1. Draw Background
-    ctx.fillStyle = '#09090b';
+    // 1. Draw Background (Void)
+    ctx.fillStyle = '#030304'; // Void color from design system
     ctx.fillRect(0, 0, width, height);
 
     if (backgroundImage) {
-      // ... (Background Image logic) ...
       ctx.save();
       let scale = 1;
       let tx = 0, ty = 0;
       
       if (settings.kenBurns && isPlaying) {
+        // Deterministic time for effect
         const t = (elapsedTime * 1000) / 20000; 
         scale = 1.05 + Math.sin(t) * 0.02;
         tx = Math.cos(t * 0.5) * 15; 
         ty = Math.sin(t * 0.3) * 15;
       }
 
-      const img = backgroundImage;
-      const imgWidth = 'width' in img ? (img.width as number) : (img as any).videoWidth || width;
-      const imgHeight = 'height' in img ? (img.height as number) : (img as any).videoHeight || height;
+      // Use type assertion to access width/height safely on any CanvasImageSource that has them
+      const img = backgroundImage as any;
+      const imgWidth = img.videoWidth || img.width || width;
+      const imgHeight = img.videoHeight || img.height || height;
 
       const r = width / height;
       const ir = imgWidth / imgHeight;
@@ -78,23 +84,33 @@ export class VisualizerCore {
 
       ctx.translate(width/2 + tx, height/2 + ty);
       ctx.scale(scale, scale);
-      ctx.drawImage(img, -dw/2, -dh/2, dw, dh);
+      
+      // Draw image centered
+      try {
+          ctx.drawImage(backgroundImage, -dw/2, -dh/2, dw, dh);
+      } catch (e) {
+          // Fallback if image is broken/not ready
+          console.warn("Image draw failed", e);
+      }
+      
       ctx.restore();
 
-      // Gradient Overlay
+      // Gradient Overlay (Cinematic vignette)
       const gradientHeight = height * 0.5;
       const grad = ctx.createLinearGradient(0, height - gradientHeight, 0, height);
-      grad.addColorStop(0, 'rgba(0,0,0,0)');
-      grad.addColorStop(0.4, 'rgba(0,0,0,0.2)');
-      grad.addColorStop(0.8, 'rgba(0,0,0,0.8)');
-      grad.addColorStop(1, 'rgba(0,0,0,0.95)');
+      grad.addColorStop(0, 'rgba(3,3,4,0)');
+      grad.addColorStop(0.4, 'rgba(3,3,4,0.2)');
+      grad.addColorStop(0.8, 'rgba(3,3,4,0.8)');
+      grad.addColorStop(1, 'rgba(3,3,4,0.95)');
       
       ctx.fillStyle = grad;
       ctx.fillRect(0, height - gradientHeight, width, gradientHeight);
+
     } else {
+        // Fallback Gradient
         const g = ctx.createRadialGradient(width/2, height/2, 0, width/2, height/2, width);
-        g.addColorStop(0, '#27272a');
-        g.addColorStop(1, '#000000');
+        g.addColorStop(0, '#27272a'); // Carbon-ish
+        g.addColorStop(1, '#030304'); // Void
         ctx.fillStyle = g;
         ctx.fillRect(0, 0, width, height);
     }
@@ -124,11 +140,14 @@ export class VisualizerCore {
         for (let i = 0; i < visibleBars; i++) {
             const idx = i * 2; 
             const val = state[idx];
+            
             let h = Math.max(12, Math.pow(val, 1.4) * maxH);
+
             const x = (originX + vizWidth) - ((visibleBars - i) * (barW + gap));
             const y = originY;
+
             ctx.beginPath();
-            ctx.roundRect(x, y - h, barW, h, 10);
+            ctx.roundRect(x, y - h, barW, h, 4); // Sharper corners for industrial look
             ctx.fill();
         }
     } else if (settings.visualizerMode === VisualizerMode.Orbital) {
@@ -142,30 +161,40 @@ export class VisualizerCore {
             const angle = (i / 32) * Math.PI * 2;
             const val = state[i];
             const h = Math.max(4, Math.pow(val, 1.2) * maxBarH);
+            
             const x1 = cx + Math.cos(angle) * radius;
             const y1 = cy + Math.sin(angle) * radius;
             const x2 = cx + Math.cos(angle) * (radius + h);
             const y2 = cy + Math.sin(angle) * (radius + h);
+
             ctx.moveTo(x1, y1);
             ctx.lineTo(x2, y2);
         }
         ctx.lineWidth = 6;
         ctx.stroke();
+
+        // Inner Glow
         ctx.beginPath();
         ctx.arc(cx, cy, radius - 10, 0, Math.PI * 2);
-        ctx.fillStyle = `${settings.visualizerColor}20`;
+        ctx.fillStyle = `${settings.visualizerColor}20`; // Low opacity fill
         ctx.fill();
+
     } else if (settings.visualizerMode === VisualizerMode.Wave) {
         const centerY = height / 2;
         const startX = 0;
         const step = width / 32;
         const amp = 150 * settings.visualizerIntensity;
+
         ctx.beginPath();
         ctx.moveTo(startX, centerY);
+
         for (let i = 0; i < 32; i++) {
             const x = startX + (i * step);
             const val = state[i];
+            // Sine wave modulation based on frequency data
             const y = centerY + Math.sin(i * 0.5 + elapsedTime * 2) * (val * amp);
+            
+            // Smooth curve
             if (i === 0) ctx.moveTo(x, y);
             else {
                 const prevX = startX + ((i - 1) * step);
@@ -179,7 +208,7 @@ export class VisualizerCore {
         ctx.stroke();
     }
 
-    // 3. Overlays (Text)
+    // 3. Overlays (Text - Minimalist Metadata)
     ctx.shadowBlur = 0;
     
     if (currentTrack && settings.showTitle) {
@@ -201,8 +230,8 @@ export class VisualizerCore {
         // Title
         ctx.font = `700 ${titleSize}px "${fontName}", ${fallback}`;
         ctx.fillStyle = '#ffffff';
-        ctx.shadowColor = 'rgba(0,0,0,0.5)';
-        ctx.shadowBlur = 4;
+        ctx.shadowColor = 'rgba(0,0,0,0.8)';
+        ctx.shadowBlur = 10;
         ctx.fillText(currentTrack.name, textX, textY - artistSize - spacing);
         
         // Artist
@@ -219,7 +248,7 @@ export class VisualizerCore {
         const totalWidth = width - (padding * 2);
         
         // Background
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
         ctx.fillRect(padding, height - padding + 20, totalWidth, barHeight);
         
         // Fill
