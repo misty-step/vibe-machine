@@ -19,7 +19,8 @@ import {
   Video,
   Disc,
   Maximize2,
-  ChevronDown
+  ChevronDown,
+  BarChart2
 } from 'lucide-react';
 
 export const Icons = {
@@ -43,5 +44,6 @@ export const Icons = {
   Video,
   Disc,
   Maximize: Maximize2,
-  ChevronDown
+  ChevronDown,
+  BarChart2
 };
