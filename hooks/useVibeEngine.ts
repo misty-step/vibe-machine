@@ -53,7 +53,13 @@ export const useVibeEngine = () => {
                 duration
             });
         }
+        
+        const wasEmpty = useVibeStore.getState().playlist.length === 0;
         addTracks(tracks);
+        
+        if (wasEmpty && tracks.length > 0) {
+            selectTrack(tracks[0].id);
+        }
     },
     removeTrack,
     updateTrackInfo,
