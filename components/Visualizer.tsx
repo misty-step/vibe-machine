@@ -83,19 +83,23 @@ const Visualizer: React.FC<VisualizerProps> = ({
     // 3. Delegate to Core
     const elapsedTime = (Date.now() - startTimeRef.current) / 1000;
     
-    coreRef.current.render(
-        ctx,
-        width,
-        height,
-        settings,
-        frequencyData,
-        imageRef.current,
-        currentTrack,
-        currentTimeRef.current,
-        durationRef.current,
-        isPlayingRef.current,
-        elapsedTime
-    );
+    try {
+      coreRef.current.render(
+          ctx,
+          width,
+          height,
+          settings,
+          frequencyData,
+          imageRef.current,
+          currentTrack,
+          currentTimeRef.current,
+          durationRef.current,
+          isPlayingRef.current,
+          elapsedTime
+      );
+    } catch (e) {
+      console.error("Visualizer Render Error:", e);
+    }
     
     requestRef.current = requestAnimationFrame(draw);
   };
