@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Icons } from './components/Icons';
 import Visualizer from './components/Visualizer';
-import { VibeSettings, VisualizerMode, AspectRatio, FontFamily, FontSize, TextPosition } from './types';
+import { VibeSettings, VisualizerMode, AspectRatio, FontFamily, FontSize } from './types';
 import { useAudioEngine } from './hooks/useAudioEngine';
 import { VideoRenderer } from './components/VideoRenderer';
 import { Sidebar } from './components/Sidebar';
@@ -68,8 +68,6 @@ const App: React.FC = () => {
     fontSize: FontSize.Medium,
     showTitle: true,
     showProgress: true,
-    customText: '',
-    textPosition: TextPosition.BottomLeft,
     kenBurns: true,
     blurBackground: false,
     visualizerColor: '#ffb703', // Plasma

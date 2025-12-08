@@ -35,14 +35,6 @@ export enum AspectRatio {
   OneOne = '1/1'
 }
 
-export enum TextPosition {
-  TopLeft = 'Top Left',
-  TopRight = 'Top Right',
-  BottomLeft = 'Bottom Left',
-  BottomRight = 'Bottom Right',
-  Center = 'Center'
-}
-
 export interface VibeSettings {
   visualizerMode: VisualizerMode;
   aspectRatio: AspectRatio;
@@ -50,8 +42,6 @@ export interface VibeSettings {
   fontSize: FontSize;
   showTitle: boolean;
   showProgress: boolean;
-  customText: string;
-  textPosition: TextPosition;
   kenBurns: boolean;
   blurBackground: boolean;
   visualizerColor: string;

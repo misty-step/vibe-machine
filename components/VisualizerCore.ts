@@ -1,4 +1,4 @@
-import { VibeSettings, Track, VisualizerMode, TextPosition } from '../types';
+import { VibeSettings, Track, VisualizerMode } from '../types';
 
 // ... (existing constants) ...
 
@@ -74,7 +74,6 @@ export class VisualizerCore {
     }
 
     // 2. Render Visualization
-    // ... (Visualization rendering logic - same as before) ...
     ctx.strokeStyle = settings.visualizerColor;
     ctx.fillStyle = settings.visualizerColor;
     ctx.lineCap = 'round';
@@ -95,6 +94,7 @@ export class VisualizerCore {
         const gap = 12; 
         const maxH = 200 * settings.visualizerIntensity;
 
+        // Align to Bottom Right
         for (let i = 0; i < visibleBars; i++) {
             const idx = i * 2; 
             const val = state[idx];
@@ -155,91 +155,54 @@ export class VisualizerCore {
 
     // 3. Overlays (Text)
     ctx.shadowBlur = 0;
-    const shouldShowText = settings.showTitle && (currentTrack || settings.customText);
     
-    if (shouldShowText) {
+    if (currentTrack && settings.showTitle) {
         const padding = 80;
-        let textX = padding; 
-        let textY = height - padding;
+        const textX = padding; 
+        const textY = height - padding;
         
-        // Text Content
-        const title = settings.customText || currentTrack?.name || '';
-        const artist = settings.customText ? '' : (currentTrack?.artist || 'Unknown Artist');
-
-        // Styling
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'bottom';
+        
         const fontName = settings.fontFamily || 'Geist Sans';
         const fallback = fontName.includes('Playfair') ? 'serif' : 'sans-serif';
         const scale = settings.fontSize || 1.0;
+
         const titleSize = 48 * scale;
         const artistSize = 32 * scale;
         const spacing = 15 * scale;
 
-        // Positioning Logic
-        ctx.textAlign = 'left'; 
-        ctx.textBaseline = 'bottom';
-
-        switch (settings.textPosition) {
-            case TextPosition.TopLeft:
-                textX = padding;
-                textY = padding + titleSize + artistSize + spacing;
-                break;
-            case TextPosition.TopRight:
-                textX = width - padding;
-                textY = padding + titleSize + artistSize + spacing;
-                ctx.textAlign = 'right';
-                break;
-            case TextPosition.BottomRight:
-                textX = width - padding;
-                textY = height - padding;
-                ctx.textAlign = 'right';
-                break;
-            case TextPosition.Center:
-                textX = width / 2;
-                textY = height / 2;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                break;
-            case TextPosition.BottomLeft:
-            default:
-                textX = padding;
-                textY = height - padding;
-                break;
-        }
-
-        // Rendering
-        ctx.shadowColor = 'rgba(0,0,0,0.8)';
-        ctx.shadowBlur = 10;
-        
-        // Artist (Secondary Line)
-        if (artist) {
-            ctx.font = `500 ${artistSize}px "${fontName}", ${fallback}`;
-            ctx.fillStyle = '#d4d4d8'; // Zinc-300
-            ctx.fillText(artist, textX, textY);
-            
-            // Adjust Y for Title (Primary Line)
-            textY -= (artistSize + spacing);
-        }
-
-        // Title (Primary Line)
+        // Title
         ctx.font = `700 ${titleSize}px "${fontName}", ${fallback}`;
         ctx.fillStyle = '#ffffff';
-        ctx.fillText(title, textX, textY);
+        ctx.shadowColor = 'rgba(0,0,0,0.5)';
+        ctx.shadowBlur = 4;
+        ctx.fillText(currentTrack.name, textX, textY - artistSize - spacing);
+        
+        // Artist
+        ctx.font = `500 ${artistSize}px "${fontName}", ${fallback}`;
+        ctx.fillStyle = '#d4d4d8';
+        ctx.fillText(currentTrack.artist || 'Unknown Artist', textX, textY);
     }
     
-    // 4. Progress Bar (Only show if not centered to avoid clutter)
-    if (settings.showProgress && duration > 0 && settings.textPosition !== TextPosition.Center) {
+    // 4. Progress Bar
+    if (settings.showProgress && duration > 0) {
         const padding = 80;
         const barHeight = 4;
         const progress = currentTime / duration;
         const totalWidth = width - (padding * 2);
         
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-        ctx.fillRect(padding, height - 40, totalWidth, barHeight); // Fixed bottom position for progress
+        // Background
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+        ctx.fillRect(padding, height - padding + 20, totalWidth, barHeight);
         
+        // Fill
         ctx.fillStyle = settings.visualizerColor;
         ctx.shadowColor = settings.visualizerColor;
         ctx.shadowBlur = 10;
-        ctx.fillRect(padding, height - 40, totalWidth * progress, barHeight);
+        ctx.fillRect(padding, height - padding + 20, totalWidth * progress, barHeight);
+        
+        // Reset Shadow
         ctx.shadowBlur = 0;
     }
   }

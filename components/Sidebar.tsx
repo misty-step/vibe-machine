@@ -7,7 +7,6 @@ import {
     AspectRatio, 
     FontFamily, 
     FontSize, 
-    TextPosition,
     PRESET_COLORS 
 } from '../types';
 import { formatTime } from '../utils';
@@ -51,7 +50,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     onSelectTrack,
     onExport
 }) => {
-    const [activeTab, setActiveTab] = useState<'media' | 'style' | 'text' | 'export'>('media');
+    const [activeTab, setActiveTab] = useState<'media' | 'style' | 'export'>('media');
 
     const randomizeVibe = () => {
         const randomColor = PRESET_COLORS[Math.floor(Math.random() * PRESET_COLORS.length)];
@@ -69,8 +68,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <aside className={`w-80 flex flex-col border-r border-white/5 bg-carbon/90 backdrop-blur-xl z-10 transition-all duration-500 ${isCinemaMode ? '-ml-80' : 'ml-0'}`}>
           
           {/* Deck Header / Mode Switch */}
-          <div className="grid grid-cols-4 border-b border-white/5 p-1 gap-1 bg-black/20">
-            {['media', 'style', 'text', 'export'].map((tab) => (
+          <div className="grid grid-cols-3 border-b border-white/5 p-1 gap-1 bg-black/20">
+            {['media', 'style', 'export'].map((tab) => (
                 <button 
                     key={tab}
                     onClick={() => setActiveTab(tab as any)}
@@ -272,69 +271,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     </div>
                 </div>
 
-                {/* Mechanical Toggles */}
-                <div className="space-y-2">
-                     <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Processing</h3>
-                     
-                     <div className="grid grid-cols-1 gap-px bg-white/5 border border-white/5 rounded-sm overflow-hidden">
-                        {[
-                            { label: 'Ken Burns', key: 'kenBurns' },
-                            { label: 'Darken BG', key: 'blurBackground' }
-                        ].map((item) => (
-                            <label key={item.key} className="flex items-center justify-between p-3 bg-black/20 hover:bg-white/5 cursor-pointer group transition-colors">
-                                <span className="text-[11px] text-zinc-400 font-medium group-hover:text-zinc-200">{item.label}</span>
-                                <div className="relative">
-                                    <input 
-                                        type="checkbox" 
-                                        checked={(settings as any)[item.key]} 
-                                        onChange={(e) => setSettings(s => ({ ...s, [item.key]: e.target.checked }))} 
-                                        className="peer sr-only" 
-                                    />
-                                    <div className="w-8 h-4 bg-zinc-800 rounded-full peer-checked:bg-plasma/20 peer-checked:border peer-checked:border-plasma transition-all"></div>
-                                    <div className="absolute top-0.5 left-0.5 w-3 h-3 bg-zinc-500 rounded-full peer-checked:bg-plasma peer-checked:translate-x-4 transition-all shadow-sm"></div>
-                                </div>
-                            </label>
-                        ))}
-                     </div>
-                </div>
-
-                {/* Intensity Slider */}
-                <div className="space-y-2">
-                    <div className="flex justify-between">
-                        <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Gain</h3>
-                        <span className="text-[10px] font-mono text-plasma">{(settings.visualizerIntensity * 100).toFixed(0)}%</span>
-                    </div>
-                    <input 
-                        type="range" 
-                        min="0.1" 
-                        max="2.0" 
-                        step="0.1" 
-                        value={settings.visualizerIntensity}
-                        onChange={(e) => setSettings(s => ({ ...s, visualizerIntensity: parseFloat(e.target.value) }))}
-                        className="w-full h-1 bg-zinc-800 rounded-full appearance-none cursor-pointer accent-plasma hover:accent-amber-400"
-                    />
-                </div>
-
-              </div>
-            )}
-
-            {/* TEXT TAB */}
-            {activeTab === 'text' && (
-              <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-300">
-                
-                {/* Custom Text Input */}
-                <div className="space-y-2">
-                    <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Custom_Overlay</h3>
-                    <input 
-                        type="text" 
-                        value={settings.customText}
-                        onChange={(e) => setSettings(s => ({ ...s, customText: e.target.value }))}
-                        placeholder="ENTER_TEXT..."
-                        className="w-full bg-black/20 border border-white/10 rounded-sm px-3 py-3 text-[11px] font-mono text-plasma focus:outline-none focus:border-plasma placeholder-zinc-700"
-                    />
-                    <p className="text-[9px] text-zinc-600 font-mono">Leave empty to use Track Metadata.</p>
-                </div>
-
                 {/* Typography Dropdown */}
                 <div className="space-y-2">
                     <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Typography</h3>
@@ -379,55 +315,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     </div>
                 </div>
 
-                {/* Position Grid */}
+                {/* Mechanical Toggles */}
                 <div className="space-y-2">
-                    <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Position</h3>
-                    <div className="grid grid-cols-3 gap-1 aspect-video bg-black/20 border border-white/5 p-1">
-                        {/* Top Left */}
-                        <button 
-                            onClick={() => setSettings(s => ({ ...s, textPosition: TextPosition.TopLeft }))}
-                            className={`rounded-sm border transition-all ${settings.textPosition === TextPosition.TopLeft ? 'bg-plasma border-plasma' : 'border-white/5 hover:bg-white/5'}`}
-                        ></button>
-                        {/* Top Center (Empty/Spacer) */}
-                        <div></div>
-                        {/* Top Right */}
-                        <button 
-                            onClick={() => setSettings(s => ({ ...s, textPosition: TextPosition.TopRight }))}
-                            className={`rounded-sm border transition-all ${settings.textPosition === TextPosition.TopRight ? 'bg-plasma border-plasma' : 'border-white/5 hover:bg-white/5'}`}
-                        ></button>
-
-                        {/* Middle Left (Spacer) */}
-                        <div></div>
-                        {/* Center */}
-                        <button 
-                            onClick={() => setSettings(s => ({ ...s, textPosition: TextPosition.Center }))}
-                            className={`rounded-sm border transition-all ${settings.textPosition === TextPosition.Center ? 'bg-plasma border-plasma' : 'border-white/5 hover:bg-white/5'}`}
-                        ></button>
-                        {/* Middle Right (Spacer) */}
-                        <div></div>
-
-                        {/* Bottom Left */}
-                        <button 
-                            onClick={() => setSettings(s => ({ ...s, textPosition: TextPosition.BottomLeft }))}
-                            className={`rounded-sm border transition-all ${settings.textPosition === TextPosition.BottomLeft ? 'bg-plasma border-plasma' : 'border-white/5 hover:bg-white/5'}`}
-                        ></button>
-                        {/* Bottom Center (Spacer) */}
-                        <div></div>
-                        {/* Bottom Right */}
-                        <button 
-                            onClick={() => setSettings(s => ({ ...s, textPosition: TextPosition.BottomRight }))}
-                            className={`rounded-sm border transition-all ${settings.textPosition === TextPosition.BottomRight ? 'bg-plasma border-plasma' : 'border-white/5 hover:bg-white/5'}`}
-                        ></button>
-                    </div>
-                </div>
-
-                {/* Text Toggles */}
-                <div className="space-y-2">
-                     <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Visibility</h3>
+                     <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Overlays</h3>
+                     
                      <div className="grid grid-cols-1 gap-px bg-white/5 border border-white/5 rounded-sm overflow-hidden">
                         {[
-                            { label: 'Show Text', key: 'showTitle' },
-                            { label: 'Show Progress', key: 'showProgress' },
+                            { label: 'Track Title', key: 'showTitle' },
+                            { label: 'Progress Bar', key: 'showProgress' },
+                            { label: 'Ken Burns', key: 'kenBurns' },
+                            { label: 'Darken BG', key: 'blurBackground' }
                         ].map((item) => (
                             <label key={item.key} className="flex items-center justify-between p-3 bg-black/20 hover:bg-white/5 cursor-pointer group transition-colors">
                                 <span className="text-[11px] text-zinc-400 font-medium group-hover:text-zinc-200">{item.label}</span>
@@ -444,6 +341,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             </label>
                         ))}
                      </div>
+                </div>
+
+                {/* Intensity Slider */}
+                <div className="space-y-2">
+                    <div className="flex justify-between">
+                        <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Gain</h3>
+                        <span className="text-[10px] font-mono text-plasma">{(settings.visualizerIntensity * 100).toFixed(0)}%</span>
+                    </div>
+                    <input 
+                        type="range" 
+                        min="0.1" 
+                        max="2.0" 
+                        step="0.1" 
+                        value={settings.visualizerIntensity}
+                        onChange={(e) => setSettings(s => ({ ...s, visualizerIntensity: parseFloat(e.target.value) }))}
+                        className="w-full h-1 bg-zinc-800 rounded-full appearance-none cursor-pointer accent-plasma hover:accent-amber-400"
+                    />
                 </div>
 
               </div>
