@@ -3,11 +3,37 @@ import { VibeSettings, Track, VisualizerMode } from '../types';
 // ... (existing constants) ...
 
 export class VisualizerCore {
-  // ... (existing state and constructor) ...
+  private physicsState: Float32Array;
+  
+  constructor() {
+    this.physicsState = new Float32Array(64).fill(0);
+  }
 
-  // ... (existing updatePhysics method) ...
+  // Pure logic to update physics state based on audio data
+  private updatePhysics = (frequencyData: Uint8Array) => {
+    const state = this.physicsState;
+    const barCount = 32;
 
-  public render(
+    for (let i = 0; i < barCount; i++) {
+        let target = 0;
+        
+        // Logarithmic Mapping
+        const freqIndex = Math.floor(Math.pow(1.18, i + 5));
+        // Average 2 bins for stability
+        const v1 = frequencyData[freqIndex] || 0;
+        const v2 = frequencyData[freqIndex+1] || 0;
+        target = ((v1 + v2) / 2) / 255.0;
+        
+        // High Energy Boost
+        target = target * 1.3;
+
+        // Physics: Attack / Decay
+        const alpha = target > state[i] ? ATTACK : DECAY;
+        state[i] = state[i] + (target - state[i]) * alpha;
+    }
+  }
+
+  public render = (
     ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
     width: number,
     height: number,
@@ -19,8 +45,8 @@ export class VisualizerCore {
     duration: number,
     isPlaying: boolean,
     elapsedTime: number 
-  ) {
-    // ... (Update physics and Draw Background - same as before) ...
+  ) => {
+    // Update physics first
     this.updatePhysics(frequencyData);
 
     // 1. Draw Background
