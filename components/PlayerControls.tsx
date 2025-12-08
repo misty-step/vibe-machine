@@ -2,6 +2,7 @@ import React from 'react';
 import { Icons } from './Icons';
 import { Track } from '../types';
 import { formatTime } from '../utils';
+import { AudioSystem } from '../engine/AudioSystem';
 
 interface PlayerControlsProps {
     isPlaying: boolean;
@@ -22,6 +23,12 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
     onNext,
     onPrev
 }) => {
+    const handlePlayPause = async () => {
+        // Unlock audio context on user interaction
+        await AudioSystem.getInstance().unlock();
+        onPlayPause();
+    };
+
     return (
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 z-30 w-[400px]">
             
@@ -48,7 +55,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
 
                 {/* Play/Pause */}
                 <button 
-                    onClick={onPlayPause}
+                    onClick={handlePlayPause}
                     className="w-16 flex items-center justify-center border-r border-white/5 bg-white/5 hover:bg-plasma hover:text-black text-white transition-all active:scale-95"
                 >
                     {isPlaying ? <Icons.Pause className="w-5 h-5 fill-current" /> : <Icons.Play className="w-5 h-5 fill-current" />}
