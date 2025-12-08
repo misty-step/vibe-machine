@@ -17,15 +17,10 @@ export const useVibeEngine = () => {
     duration
   } = useVibeStore();
 
-  // Sync Playback Control
+  // Ensure AudioSystem is initialized
   useEffect(() => {
-    const engine = AudioSystem.getInstance();
-    if (isPlaying) engine.play();
-    else engine.pause();
-  }, [isPlaying]);
-
-  // Sync Track Selection (Already handled in AudioSystem via store subscription, 
-  // but the store state needs to drive the UI)
+      AudioSystem.getInstance();
+  }, []);
   
   const audioElRef = useRef<HTMLAudioElement | null>(null);
 
