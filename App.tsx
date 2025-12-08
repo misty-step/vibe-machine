@@ -8,6 +8,30 @@ import { Sidebar } from './components/Sidebar';
 import { PlayerControls } from './components/PlayerControls';
 import { useObjectUrl } from './hooks/useObjectUrl';
 
+// --- Subcomponents ---
+
+const ViewfinderOverlay: React.FC = () => (
+    <div className="absolute inset-0 pointer-events-none z-20">
+        {/* Corners */}
+        <div className="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 border-white/20"></div>
+        <div className="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-white/20"></div>
+        <div className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-white/20"></div>
+        <div className="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-white/20"></div>
+        
+        {/* Crosshairs */}
+        <div className="absolute top-1/2 left-4 w-2 h-px bg-white/20"></div>
+        <div className="absolute top-1/2 right-4 w-2 h-px bg-white/20"></div>
+        <div className="absolute top-4 left-1/2 w-px h-2 bg-white/20"></div>
+        <div className="absolute bottom-4 left-1/2 w-px h-2 bg-white/20"></div>
+
+        {/* REC Indicator */}
+        <div className="absolute top-4 right-4 flex items-center gap-2">
+            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.6)]"></div>
+            <span className="text-[10px] font-mono text-red-500 font-bold tracking-widest">REC_READY</span>
+        </div>
+    </div>
+);
+
 const App: React.FC = () => {
   // --- Audio Engine ---
   const {
@@ -46,7 +70,7 @@ const App: React.FC = () => {
     showProgress: true,
     kenBurns: true,
     blurBackground: false,
-    visualizerColor: '#f59e0b', // Default to Electric Amber
+    visualizerColor: '#ffb703', // Plasma
     visualizerIntensity: 1.0
   });
 
@@ -59,12 +83,10 @@ const App: React.FC = () => {
         const file = e.target.files[0];
         setBackgroundImageFile(file);
       } else {
-        // Convert FileList to Array
         const files = Array.from(e.target.files) as File[];
         await addTracks(files);
       }
     }
-    // Reset input
     e.target.value = '';
   };
 
@@ -75,7 +97,6 @@ const App: React.FC = () => {
             setIsCinemaMode(false);
         }
         if (e.code === 'Space') {
-            // Prevent scrolling
             e.preventDefault();
             playPause();
         }
@@ -98,7 +119,6 @@ const App: React.FC = () => {
 
         const renderer = new VideoRenderer();
         
-        // Determine resolution based on aspect ratio
         let width = 1920;
         let height = 1080;
         if (settings.aspectRatio === AspectRatio.OneOne) { width = 1080; height = 1080; }
@@ -112,7 +132,7 @@ const App: React.FC = () => {
                 width,
                 height,
                 fps: 30,
-                bitrate: 6_000_000 // 6 Mbps
+                bitrate: 6_000_000 
             },
             (progress, status) => {
                 setExportProgress(Math.min(100, Math.round(progress * 100)));
@@ -120,7 +140,6 @@ const App: React.FC = () => {
             }
         );
 
-        // Download
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
@@ -145,37 +164,35 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-[100dvh] bg-[#050505] text-zinc-100 font-sans selection:bg-amber-500 selection:text-black overflow-hidden relative">
+    <div className="flex flex-col h-[100dvh] bg-void text-zinc-100 font-sans selection:bg-plasma selection:text-black overflow-hidden relative">
       {/* Film Grain Overlay */}
-      <div className="fixed inset-0 pointer-events-none z-50 bg-noise opacity-[0.03] mix-blend-overlay"></div>
+      <div className="fixed inset-0 pointer-events-none z-50 bg-noise opacity-[0.02] mix-blend-overlay"></div>
 
       {/* Hidden Audio Element */}
       <audio ref={audioElRef} crossOrigin="anonymous" />
 
       {/* Header */}
-      <header className={`h-14 border-b border-white/10 flex items-center px-6 justify-between bg-black/40 backdrop-blur-md z-20 transition-all duration-500 ${isCinemaMode ? '-mt-14' : 'mt-0'}`}>
+      <header className={`h-12 border-b border-white/5 flex items-center px-4 justify-between bg-carbon/80 backdrop-blur-md z-20 transition-all duration-500 ${isCinemaMode ? '-mt-12' : 'mt-0'}`}>
         <div className="flex items-center gap-3">
-            <div className="w-6 h-6 bg-amber-500 rounded flex items-center justify-center shadow-[0_0_15px_rgba(245,158,11,0.4)]">
-                <Icons.Video className="w-3.5 h-3.5 text-black" />
+            <div className="w-5 h-5 bg-plasma rounded-sm flex items-center justify-center shadow-glow shadow-plasma/50">
+                <Icons.Video className="w-3 h-3 text-black" />
             </div>
-            <h1 className="text-lg font-bold tracking-tight text-white uppercase">Vibe Machine</h1>
+            <h1 className="text-xs font-bold tracking-widest text-white uppercase font-mono">Vibe_Machine <span className="text-zinc-600">v2.0</span></h1>
         </div>
-        <div className="flex gap-6 items-center text-xs font-medium text-zinc-500 tracking-wide">
+        <div className="flex gap-4 items-center text-[10px] font-bold text-zinc-500 tracking-wide font-mono uppercase">
              <button 
                 onClick={() => setIsCinemaMode(true)}
-                className="flex items-center gap-2 hover:text-amber-400 transition-colors group"
+                className="flex items-center gap-2 hover:text-plasma transition-colors group"
                 title="Enter Cinema Mode"
              >
-                 <Icons.Maximize className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                 <span className="hidden sm:inline">CINEMA MODE</span>
+                 <Icons.Maximize className="w-3 h-3 group-hover:scale-110 transition-transform" />
+                 <span className="hidden sm:inline">Cinema_Mode</span>
              </button>
-             <div className="w-px h-4 bg-white/10"></div>
-             <a href="#" className="hover:text-amber-400 transition-colors">v1.0.0</a>
         </div>
       </header>
 
       {/* Main Workspace */}
-      <div className="flex flex-1 overflow-hidden relative">
+      <div className="flex flex-1 overflow-hidden relative bg-grid-pattern bg-grid">
         
         <Sidebar 
             isCinemaMode={isCinemaMode}
@@ -196,13 +213,16 @@ const App: React.FC = () => {
         />
 
         {/* Right Area: Preview Canvas */}
-        <main className="flex-1 bg-black p-8 flex flex-col items-center justify-center relative">
-          {/* Main Stage */}
-          <div className={`relative transition-all duration-500 shadow-2xl ring-1 ring-white/10 ${
-              settings.aspectRatio === AspectRatio.SixteenNine ? 'w-full max-w-4xl aspect-video' : 
+        <main className="flex-1 flex flex-col items-center justify-center relative p-8">
+          
+          {/* Main Stage (Lens) */}
+          <div className={`relative transition-all duration-500 bg-black shadow-2xl ring-1 ring-white/10 overflow-hidden ${
+              settings.aspectRatio === AspectRatio.SixteenNine ? 'w-full max-w-5xl aspect-video' : 
               settings.aspectRatio === AspectRatio.OneOne ? 'h-full max-h-[600px] aspect-square' :
               'h-full max-h-[80vh] aspect-[9/16]'
           }`}>
+              <ViewfinderOverlay />
+              
               <Visualizer 
                 settings={settings}
                 backgroundImage={backgroundImage}
@@ -215,21 +235,15 @@ const App: React.FC = () => {
               
               {/* Empty State Overlay */}
               {playlist.length === 0 && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm rounded-lg z-10 animate-in fade-in duration-700">
-                      <div className="bg-white/5 border border-white/10 p-8 rounded-2xl flex flex-col items-center text-center shadow-[0_0_50px_rgba(0,0,0,0.5)] backdrop-blur-md max-w-sm mx-auto transform transition-all hover:scale-105 hover:bg-white/10 hover:border-amber-500/30">
-                          <div className="w-16 h-16 bg-gradient-to-br from-amber-500 to-amber-700 rounded-full flex items-center justify-center mb-6 shadow-lg shadow-amber-500/20">
-                              <Icons.Upload className="w-8 h-8 text-black" />
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm z-10 animate-in fade-in duration-700">
+                      <div className="border border-white/10 p-8 bg-carbon/50 flex flex-col items-center text-center shadow-glow shadow-plasma/10 backdrop-blur-md max-w-sm mx-auto">
+                          <div className="w-12 h-12 border border-plasma text-plasma rounded-full flex items-center justify-center mb-4 shadow-glow shadow-plasma/40 animate-pulse">
+                              <Icons.Upload className="w-5 h-5" />
                           </div>
-                          <h2 className="text-xl font-bold text-white mb-2 tracking-tight">Ignite the Machine</h2>
-                          <p className="text-sm text-zinc-400 leading-relaxed mb-6">
-                              Drop your audio tracks and background visuals here to begin the reaction.
+                          <h2 className="text-sm font-bold text-white mb-2 tracking-widest uppercase font-mono">System_Idle</h2>
+                          <p className="text-[11px] text-zinc-500 leading-relaxed mb-6 font-mono uppercase">
+                              Initialize audio & video streams to begin processing.
                           </p>
-                          <div className="flex gap-3 text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
-                              <span className="bg-black/30 px-3 py-1 rounded border border-white/5">MP3</span>
-                              <span className="bg-black/30 px-3 py-1 rounded border border-white/5">WAV</span>
-                              <span className="bg-black/30 px-3 py-1 rounded border border-white/5">JPG</span>
-                              <span className="bg-black/30 px-3 py-1 rounded border border-white/5">PNG</span>
-                          </div>
                       </div>
                   </div>
               )}

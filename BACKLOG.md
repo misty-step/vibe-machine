@@ -4,11 +4,10 @@ Last groomed: December 7, 2025
 Analyzed by: Gemini CLI (Simulating 15 perspectives)
 
 ## Recent Shipments
+- **[Design] Holographic Industrial Overhaul** - Implemented new "Void/Plasma" design system. Refactored Sidebar (The Deck), Controls (The Transport), and Visualizer (The Lens).
 - **[Security] Secure Object URL Management** - Implemented `useObjectUrl` hook to prevent memory leaks from file uploads.
 - **[UX] "Empty State" Onboarding** - Added glassmorphism instructions overlay for empty playlists.
 - **[Architecture] Dismantle `App.tsx` God Component** - Extracted `Sidebar` and `PlayerControls` into focused components.
-- **[Feature] "Cinematic" Visualizer Modes** - Added "Orbital" and "Wave" modes.
-- **[Feature] Real MP4 Export (H.264/AAC)** - Implemented full offline rendering pipeline.
 
 ---
 
@@ -36,11 +35,11 @@ Analyzed by: Gemini CLI (Simulating 15 perspectives)
 **Approach**: Move `VisualizerCore` to a Web Worker and use `OffscreenCanvas` for rendering.
 **Effort**: 1w | **Impact**: 60fps UI even during heavy rendering.
 
-### [UX] Drag & Drop Visual Feedback
-**Perspectives**: user-experience-advocate
-**Why**: The "drop zone" is implicit. Users need visual confirmation when dragging files over the window.
-**Approach**: Add global drag-and-drop handler with a "Drop to Import" overlay.
-**Effort**: 3h
+### [Infrastructure] Unit Testing
+**Perspectives**: maintainability-maven
+**Why**: No test runner currently installed.
+**Approach**: Install `vitest`, configure in `vite.config.ts`, and expand `utils.test.ts`.
+**Effort**: 4h
 
 ---
 
@@ -63,6 +62,5 @@ Analyzed by: Gemini CLI (Simulating 15 perspectives)
 ## Learnings
 
 **From this grooming session:**
-- **UX Wins:** The "Empty State" overlay immediately makes the app feel more professional and less like a dev tool.
-- **Security:** Handling `URL.createObjectURL` properly is a small change with big stability impact for long sessions.
-- **Focus:** We are now moving from "Core Tech" (Audio/Video Engine) to "User Features" (Text, Presets, Social).
+- **Design System:** The move to "Holographic Industrial" (Void/Plasma) provides a much stronger brand identity than generic glassmorphism.
+- **Architecture:** Component separation (`Sidebar`, `PlayerControls`) made the design overhaul significantly easier and less risky.

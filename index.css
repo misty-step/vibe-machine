@@ -4,33 +4,48 @@
 
 /* Cinema Scope Scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 4px; /* Thinner */
+  height: 4px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #050505; /* Deep Obsidian */
+  background: #030304; /* Void */
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 3px;
-  transition: background 0.2s ease;
+  background: #27272a;
+  border-radius: 0px; /* Square */
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(245, 158, 11, 0.5); /* Amber-500 at 50% */
+  background: #ffb703; /* Plasma */
 }
 
 /* Global Styles */
 body {
-  background-color: #050505;
+  background-color: #030304; /* Void */
   color: #e4e4e7;
+  font-family: 'Geist Sans', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Film Grain Utility */
-.bg-noise {
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='1'/%3E%3C/svg%3E");
+/* Utilities */
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  /* Holographic Industrial Utilities */
+  .glass-panel {
+    @apply bg-carbon/80 backdrop-blur-xl border border-white/5 shadow-inner-light;
+  }
+
+  .btn-mechanical {
+    @apply border border-white/10 bg-white/5 hover:bg-white/10 active:bg-plasma active:text-black transition-all duration-75 uppercase tracking-widest text-[10px] font-bold;
+  }
+
+  .viewfinder-corner {
+    @apply absolute w-4 h-4 border-white/20;
+  }
 }

@@ -23,46 +23,63 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
     onPrev
 }) => {
     return (
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-black/40 hover:bg-black/80 backdrop-blur-xl border border-white/10 hover:border-white/20 ring-1 ring-white/5 rounded-full px-6 py-3 flex items-center gap-6 shadow-[0_8px_32px_rgba(0,0,0,0.5)] z-30 transition-all duration-500">
-             
-             <button 
-                className="text-zinc-400 hover:text-white transition-colors"
-                onClick={onPrev}
-             >
-                 <Icons.SkipBack className="w-5 h-5" />
-             </button>
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 z-30 w-[400px]">
+            
+            {/* Track Info (Holographic Float) */}
+            <div className="flex items-center justify-between w-full px-1">
+                <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
+                    {currentTrack ? 'Playing' : 'Idle'}
+                </span>
+                <span className="text-[10px] font-mono text-plasma truncate max-w-[200px] text-right">
+                    {currentTrack?.name || "No_Data"}
+                </span>
+            </div>
 
-             <button 
-                onClick={onPlayPause}
-                className="w-12 h-12 bg-white rounded-full flex items-center justify-center hover:scale-105 transition-transform shadow-lg shadow-white/10"
-             >
-                 {isPlaying ? <Icons.Pause className="w-5 h-5 text-black fill-current" /> : <Icons.Play className="w-5 h-5 text-black fill-current translate-x-0.5" />}
-             </button>
+            {/* Mechanical Transport Bar */}
+            <div className="bg-carbon/90 backdrop-blur-xl border border-white/10 shadow-glow shadow-black/50 p-1 flex items-stretch h-12 w-full">
+                
+                {/* Previous */}
+                <button 
+                    className="w-12 flex items-center justify-center border-r border-white/5 hover:bg-white/5 hover:text-white text-zinc-500 transition-colors active:bg-white/10"
+                    onClick={onPrev}
+                >
+                    <Icons.SkipBack className="w-4 h-4" />
+                </button>
 
-             <button 
-                className="text-zinc-400 hover:text-white transition-colors"
-                onClick={onNext}
-             >
-                 <Icons.SkipForward className="w-5 h-5" />
-             </button>
+                {/* Play/Pause */}
+                <button 
+                    onClick={onPlayPause}
+                    className="w-16 flex items-center justify-center border-r border-white/5 bg-white/5 hover:bg-plasma hover:text-black text-white transition-all active:scale-95"
+                >
+                    {isPlaying ? <Icons.Pause className="w-5 h-5 fill-current" /> : <Icons.Play className="w-5 h-5 fill-current" />}
+                </button>
 
-             <div className="w-px h-6 bg-white/10 mx-2"></div>
-             
-             <div className="flex flex-col w-48">
-                 <span className="text-xs font-medium text-white truncate">
-                    {currentTrack?.name || "No Track Selected"}
-                 </span>
-                 <div className="flex items-center justify-between text-[10px] text-zinc-500 font-mono mt-1">
-                     <span>{formatTime(currentTime)}</span>
-                     <div className="flex-1 mx-2 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                {/* Next */}
+                <button 
+                    className="w-12 flex items-center justify-center border-r border-white/5 hover:bg-white/5 hover:text-white text-zinc-500 transition-colors active:bg-white/10"
+                    onClick={onNext}
+                >
+                    <Icons.SkipForward className="w-4 h-4" />
+                </button>
+
+                {/* Time & Progress */}
+                <div className="flex-1 flex flex-col justify-center px-4 gap-1 group cursor-default">
+                    <div className="flex justify-between text-[9px] font-mono text-zinc-600 group-hover:text-zinc-400 transition-colors">
+                        <span>{formatTime(currentTime)}</span>
+                        <span>{formatTime(duration)}</span>
+                    </div>
+                    <div className="h-1 bg-black w-full overflow-hidden relative">
                         <div 
-                            className="h-full bg-amber-500 rounded-full" 
+                            className="absolute inset-0 bg-zinc-800"
+                        ></div>
+                        <div 
+                            className="absolute top-0 bottom-0 left-0 bg-plasma transition-all duration-100 ease-linear" 
                             style={{ width: `${duration ? (currentTime / duration) * 100 : 0}%` }}
                         ></div>
-                     </div>
-                     <span>{formatTime(duration)}</span>
-                 </div>
-             </div>
-          </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
     );
 };
