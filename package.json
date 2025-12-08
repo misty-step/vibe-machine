@@ -25,6 +25,9 @@
     "@morphllm/morphmcp": "^0.8.34",
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "autoprefixer": "^10.4.22",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.17",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
   },
