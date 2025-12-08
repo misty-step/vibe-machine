@@ -6,6 +6,7 @@ import { useAudioEngine } from './hooks/useAudioEngine';
 import { VideoRenderer } from './components/VideoRenderer';
 import { Sidebar } from './components/Sidebar';
 import { PlayerControls } from './components/PlayerControls';
+import { useObjectUrl } from './hooks/useObjectUrl';
 
 const App: React.FC = () => {
   // --- Audio Engine ---
@@ -28,7 +29,9 @@ const App: React.FC = () => {
   } = useAudioEngine();
 
   // --- UI State ---
-  const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
+  const [backgroundImageFile, setBackgroundImageFile] = useState<File | null>(null);
+  const backgroundImage = useObjectUrl(backgroundImageFile);
+  
   const [exportProgress, setExportProgress] = useState<number>(0);
   const [exportStatus, setExportStatus] = useState<string>("");
   const [isExporting, setIsExporting] = useState<boolean>(false);
@@ -54,8 +57,7 @@ const App: React.FC = () => {
     if (e.target.files && e.target.files.length > 0) {
       if (type === 'image') {
         const file = e.target.files[0];
-        const url = URL.createObjectURL(file);
-        setBackgroundImage(url);
+        setBackgroundImageFile(file);
       } else {
         // Convert FileList to Array
         const files = Array.from(e.target.files) as File[];
@@ -210,6 +212,27 @@ const App: React.FC = () => {
                 duration={duration}
                 isPlaying={isPlaying}
               />
+              
+              {/* Empty State Overlay */}
+              {playlist.length === 0 && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm rounded-lg z-10 animate-in fade-in duration-700">
+                      <div className="bg-white/5 border border-white/10 p-8 rounded-2xl flex flex-col items-center text-center shadow-[0_0_50px_rgba(0,0,0,0.5)] backdrop-blur-md max-w-sm mx-auto transform transition-all hover:scale-105 hover:bg-white/10 hover:border-amber-500/30">
+                          <div className="w-16 h-16 bg-gradient-to-br from-amber-500 to-amber-700 rounded-full flex items-center justify-center mb-6 shadow-lg shadow-amber-500/20">
+                              <Icons.Upload className="w-8 h-8 text-black" />
+                          </div>
+                          <h2 className="text-xl font-bold text-white mb-2 tracking-tight">Ignite the Machine</h2>
+                          <p className="text-sm text-zinc-400 leading-relaxed mb-6">
+                              Drop your audio tracks and background visuals here to begin the reaction.
+                          </p>
+                          <div className="flex gap-3 text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
+                              <span className="bg-black/30 px-3 py-1 rounded border border-white/5">MP3</span>
+                              <span className="bg-black/30 px-3 py-1 rounded border border-white/5">WAV</span>
+                              <span className="bg-black/30 px-3 py-1 rounded border border-white/5">JPG</span>
+                              <span className="bg-black/30 px-3 py-1 rounded border border-white/5">PNG</span>
+                          </div>
+                      </div>
+                  </div>
+              )}
           </div>
 
           <PlayerControls 

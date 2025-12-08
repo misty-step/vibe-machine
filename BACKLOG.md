@@ -3,46 +3,16 @@
 Last groomed: December 7, 2025
 Analyzed by: Gemini CLI (Simulating 15 perspectives)
 
+## Recent Shipments
+- **[Security] Secure Object URL Management** - Implemented `useObjectUrl` hook to prevent memory leaks from file uploads.
+- **[UX] "Empty State" Onboarding** - Added glassmorphism instructions overlay for empty playlists.
+- **[Architecture] Dismantle `App.tsx` God Component** - Extracted `Sidebar` and `PlayerControls` into focused components.
+- **[Feature] "Cinematic" Visualizer Modes** - Added "Orbital" and "Wave" modes.
+- **[Feature] Real MP4 Export (H.264/AAC)** - Implemented full offline rendering pipeline.
+
 ---
 
 ## Now (Sprint-Ready, <2 weeks)
-
-### [Architecture] Dismantle `App.tsx` God Component
-**File**: App.tsx:1-End
-**Perspectives**: complexity-archaeologist, architecture-guardian, maintainability-maven
-**Why**: `App.tsx` handles state, UI layout, audio orchestration, and drag-and-drop. It is a classic "Shallow Module" that does too much.
-**Approach**: 
-1. Extract `Sidebar` (settings UI) into `components/Sidebar.tsx`.
-2. Extract `PlayerControls` (playback UI) into `components/PlayerControls.tsx`.
-3. Move drag-and-drop logic to `hooks/useFileHandler.ts`.
-**Effort**: 1d | **Impact**: Unlocks parallel feature development, makes testing possible.
-
-### [Product] "Cinematic" Visualizer Modes (Orbital & Wave)
-**File**: components/VisualizerCore.ts
-**Perspectives**: product-visionary, design-systems-architect
-**Why**: Competitors (VEED, Renderforest) offer 100+ templates. Vibe Machine has 1 ("Bars"). Users leave if the "vibe" doesn't match their track.
-**Approach**: 
-1. Add `drawOrbital()`: Circular frequency spectrum with mirroring.
-2. Add `drawWave()`: Oscilloscope-style time-domain line.
-3. Update `VisualizerCore` switch statement.
-**Effort**: 3d | **Impact**: Triples content variety, retention hook.
-
-### [Security] Secure Object URL Management
-**File**: App.tsx / hooks/useFileHandler.ts
-**Perspectives**: security-sentinel
-**Why**: `URL.createObjectURL` creates memory leaks if not revoked. Current implementation in `App.tsx` is ad-hoc.
-**Approach**: Create `useObjectUrl` hook that automatically calls `revokeObjectURL` on component unmount or value change.
-**Effort**: 2h | **Risk**: Medium (Memory Leaks/Crash)
-
-### [UX] "Empty State" Onboarding
-**Perspectives**: user-experience-advocate
-**Why**: Current app starts blank. Users don't know they need to drag/drop files.
-**Approach**: Add a "Glassmorphism" overlay instruction when playlist is empty: "Drop Audio & Image Here".
-**Effort**: 4h | **Impact**: Reduces bounce rate for new users.
-
----
-
-## Next (This Quarter, <3 months)
 
 ### [Feature] Text Overlays & Smart Typography
 **Perspectives**: product-visionary, design-systems-architect
@@ -56,11 +26,21 @@ Analyzed by: Gemini CLI (Simulating 15 perspectives)
 **Approach**: Save `settings` state to `localStorage`. Add "Export Preset" (download JSON) button.
 **Effort**: 2d | **Impact**: User retention, community sharing foundation.
 
+---
+
+## Next (This Quarter, <3 months)
+
 ### [Performance] OffscreenCanvas & Worker Thread
 **Perspectives**: performance-pathfinder
 **Why**: High-res rendering (4K export) freezes the UI.
 **Approach**: Move `VisualizerCore` to a Web Worker and use `OffscreenCanvas` for rendering.
 **Effort**: 1w | **Impact**: 60fps UI even during heavy rendering.
+
+### [UX] Drag & Drop Visual Feedback
+**Perspectives**: user-experience-advocate
+**Why**: The "drop zone" is implicit. Users need visual confirmation when dragging files over the window.
+**Approach**: Add global drag-and-drop handler with a "Drop to Import" overlay.
+**Effort**: 3h
 
 ---
 
@@ -83,6 +63,6 @@ Analyzed by: Gemini CLI (Simulating 15 perspectives)
 ## Learnings
 
 **From this grooming session:**
-- **Architecture:** The core `VisualizerCore` and `VideoRenderer` are "Deep Modules" (Ousterhout approved) - they hide immense complexity. `App.tsx` is the opposite.
-- **Market:** We cannot compete on "Templates" quantity yet. We must compete on "Real-Time Experience" and "Aesthetic Quality" (The "Cinematic Ether").
-- **Gap:** Video Export is technically solved (WebCodecs) but product-wise incomplete (no text, no presets).
+- **UX Wins:** The "Empty State" overlay immediately makes the app feel more professional and less like a dev tool.
+- **Security:** Handling `URL.createObjectURL` properly is a small change with big stability impact for long sessions.
+- **Focus:** We are now moving from "Core Tech" (Audio/Video Engine) to "User Features" (Text, Presets, Social).
