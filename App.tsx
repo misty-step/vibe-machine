@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Icons } from './components/Icons';
 import Visualizer from './components/Visualizer';
-import { VibeSettings, VisualizerMode, AspectRatio, FontFamily, FontSize } from './types';
-import { useAudioEngine } from './hooks/useAudioEngine';
+import { AspectRatio, VisualizerMode, FontFamily, FontSize } from './types';
+import { useVibeEngine } from './hooks/useVibeEngine';
 import { VideoRenderer } from './components/VideoRenderer';
 import { Sidebar } from './components/Sidebar';
 import { PlayerControls } from './components/PlayerControls';
+import { useVibeStore } from './store/vibeStore';
 import { useObjectUrl } from './hooks/useObjectUrl';
 
 // --- Subcomponents ---
@@ -33,58 +34,32 @@ const ViewfinderOverlay: React.FC = () => (
 );
 
 const App: React.FC = () => {
-  // --- Audio Engine ---
-  const {
-    playlist,
-    currentTrackIndex,
-    currentTrack,
-    isPlaying,
-    currentTime,
-    duration,
-    analyser,
-    addTracks,
-    removeTrack,
-    updateTrackInfo,
-    playPause,
-    selectTrack,
-    nextTrack,
-    prevTrack,
-    audioElRef
-  } = useAudioEngine();
-
-  // --- UI State ---
-  const [backgroundImageFile, setBackgroundImageFile] = useState<File | null>(null);
-  const backgroundImage = useObjectUrl(backgroundImageFile);
+  // --- Engine ---
+  const engine = useVibeEngine();
   
-  const [exportProgress, setExportProgress] = useState<number>(0);
-  const [exportStatus, setExportStatus] = useState<string>("");
-  const [isExporting, setIsExporting] = useState<boolean>(false);
+  // --- Store State ---
+  const settings = useVibeStore((s) => s.settings);
+  const updateSettings = useVibeStore((s) => s.updateSettings);
+  const backgroundImage = useVibeStore((s) => s.backgroundImage);
+  const setBackgroundImage = useVibeStore((s) => s.setBackgroundImage);
   
-  // Settings
-  const [settings, setSettings] = useState<VibeSettings>({
-    visualizerMode: VisualizerMode.Bars,
-    aspectRatio: AspectRatio.SixteenNine,
-    fontFamily: FontFamily.Geist,
-    fontSize: FontSize.Medium,
-    showTitle: true,
-    showProgress: true,
-    kenBurns: true,
-    blurBackground: false,
-    visualizerColor: '#ffb703', // Plasma
-    visualizerIntensity: 1.0
-  });
-
-  const [isCinemaMode, setIsCinemaMode] = useState<boolean>(false);
+  const [isCinemaMode, setIsCinemaMode] = React.useState<boolean>(false);
+  const [isExporting, setIsExporting] = React.useState<boolean>(false);
+  const [exportProgress, setExportProgress] = React.useState<number>(0);
+  const [exportStatus, setExportStatus] = React.useState<string>("");
 
   // --- Handlers ---
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'audio' | 'image') => {
     if (e.target.files && e.target.files.length > 0) {
       if (type === 'image') {
         const file = e.target.files[0];
-        setBackgroundImageFile(file);
+        const url = URL.createObjectURL(file);
+        // Revoke old if exists (handled by store logic ideally, but manual here for now)
+        if (backgroundImage) URL.revokeObjectURL(backgroundImage);
+        setBackgroundImage(url);
       } else {
         const files = Array.from(e.target.files) as File[];
-        await addTracks(files);
+        await engine.addTracks(files);
       }
     }
     e.target.value = '';
@@ -98,16 +73,16 @@ const App: React.FC = () => {
         }
         if (e.code === 'Space') {
             e.preventDefault();
-            playPause();
+            engine.playPause();
         }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [playPause]);
+  }, [engine]);
 
   // Export Logic
   const handleExport = async () => {
-    if (playlist.length === 0) {
+    if (engine.playlist.length === 0) {
         alert("Please add at least one audio track to export.");
         return;
     }
@@ -125,7 +100,7 @@ const App: React.FC = () => {
         else if (settings.aspectRatio === AspectRatio.NineSixteen) { width = 1080; height = 1920; }
 
         const blob = await renderer.renderProject(
-            playlist,
+            engine.playlist,
             settings,
             backgroundImage,
             {
@@ -168,9 +143,6 @@ const App: React.FC = () => {
       {/* Film Grain Overlay */}
       <div className="fixed inset-0 pointer-events-none z-50 bg-noise opacity-[0.02] mix-blend-overlay"></div>
 
-      {/* Hidden Audio Element */}
-      <audio ref={audioElRef} crossOrigin="anonymous" />
-
       {/* Header */}
       <header className={`h-12 border-b border-white/5 flex items-center px-4 justify-between bg-carbon/80 backdrop-blur-md z-20 transition-all duration-500 ${isCinemaMode ? '-mt-12' : 'mt-0'}`}>
         <div className="flex items-center gap-3">
@@ -197,18 +169,25 @@ const App: React.FC = () => {
         <Sidebar 
             isCinemaMode={isCinemaMode}
             backgroundImage={backgroundImage}
-            playlist={playlist}
-            currentTrackIndex={currentTrackIndex}
-            isPlaying={isPlaying}
+            playlist={engine.playlist}
+            currentTrackIndex={engine.currentTrackIndex}
+            isPlaying={engine.isPlaying}
             settings={settings}
-            setSettings={setSettings}
+            setSettings={(val) => {
+                if (typeof val === 'function') {
+                    const newState = val(settings);
+                    updateSettings(newState);
+                } else {
+                    updateSettings(val);
+                }
+            }}
             isExporting={isExporting}
             exportProgress={exportProgress}
             exportStatus={exportStatus}
             onFileUpload={handleFileUpload}
-            onRemoveTrack={removeTrack}
-            onUpdateTrackInfo={updateTrackInfo}
-            onSelectTrack={selectTrack}
+            onRemoveTrack={engine.removeTrack}
+            onUpdateTrackInfo={engine.updateTrackInfo}
+            onSelectTrack={engine.selectTrack}
             onExport={handleExport}
         />
 
@@ -226,15 +205,15 @@ const App: React.FC = () => {
               <Visualizer 
                 settings={settings}
                 backgroundImage={backgroundImage}
-                analyser={analyser}
-                currentTrack={currentTrack}
-                currentTime={currentTime}
-                duration={duration}
-                isPlaying={isPlaying}
+                analyser={engine.analyser}
+                currentTrack={engine.currentTrack}
+                currentTime={engine.currentTime}
+                duration={engine.duration}
+                isPlaying={engine.isPlaying}
               />
               
               {/* Empty State Overlay */}
-              {playlist.length === 0 && (
+              {engine.playlist.length === 0 && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm z-10 animate-in fade-in duration-700">
                       <div className="border border-white/10 p-8 bg-carbon/50 flex flex-col items-center text-center shadow-glow shadow-plasma/10 backdrop-blur-md max-w-sm mx-auto">
                           <div className="w-12 h-12 border border-plasma text-plasma rounded-full flex items-center justify-center mb-4 shadow-glow shadow-plasma/40 animate-pulse">
@@ -250,13 +229,13 @@ const App: React.FC = () => {
           </div>
 
           <PlayerControls 
-              isPlaying={isPlaying}
-              currentTrack={currentTrack}
-              currentTime={currentTime}
-              duration={duration}
-              onPlayPause={playPause}
-              onNext={nextTrack}
-              onPrev={prevTrack}
+              isPlaying={engine.isPlaying}
+              currentTrack={engine.currentTrack}
+              currentTime={engine.currentTime}
+              duration={engine.duration}
+              onPlayPause={engine.playPause}
+              onNext={engine.nextTrack}
+              onPrev={engine.prevTrack}
           />
         </main>
       </div>
