@@ -166,6 +166,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                     className={`bg-transparent text-[11px] font-medium w-full focus:outline-none placeholder-zinc-700 truncate ${currentTrackIndex === idx ? 'text-white' : 'text-zinc-500 group-hover:text-zinc-300'}`}
                                     placeholder="Track Title"
                                 />
+                                <input 
+                                    value={track.artist}
+                                    onChange={(e) => onUpdateTrackInfo(track.id, 'artist', e.target.value)}
+                                    className="bg-transparent text-[9px] font-mono w-full focus:outline-none text-zinc-600 group-hover:text-zinc-300 placeholder-zinc-700 truncate"
+                                    placeholder="Artist"
+                                />
                             </div>
                             
                             <button onClick={() => onRemoveTrack(track.id)} className="text-zinc-700 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">

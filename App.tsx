@@ -8,7 +8,7 @@ import { PlayerControls } from './components/PlayerControls';
 import { useVibeStore } from './store/vibeStore';
 import { useObjectUrl } from './hooks/useObjectUrl';
 import { invoke } from '@tauri-apps/api/core';
-import { save } from '@tauri-apps/api/dialog';
+import { save } from '@tauri-apps/plugin-dialog';
 import { listen } from '@tauri-apps/api/event';
 
 // --- Subcomponents ---
@@ -86,6 +86,8 @@ const App: React.FC = () => {
             setIsCinemaMode(false);
         }
         if (e.code === 'Space') {
+            const tag = (e.target as HTMLElement)?.tagName;
+            if (tag === 'INPUT' || tag === 'TEXTAREA') return;
             e.preventDefault();
             engine.playPause();
         }

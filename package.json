@@ -10,6 +10,8 @@
     "build:wasm": "cd crates/vibe-engine && wasm-pack build --target web --out-dir ../../src/vibe-engine-wasm"
   },
   "dependencies": {
+    "@tauri-apps/api": "^2.9.1",
+    "@tauri-apps/plugin-dialog": "^2.0.0",
     "@fontsource/cinzel": "^5.2.8",
     "@fontsource/geist-sans": "^5.2.5",
     "@fontsource/inter": "^5.2.8",
