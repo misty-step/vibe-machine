@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { subscribeWithSelector } from 'zustand/middleware';
 import { VibeSettings, VisualizerMode, AspectRatio, FontFamily, FontSize, Track } from '../types';
 
 interface VibeState {
@@ -48,7 +49,8 @@ const DEFAULT_SETTINGS: VibeSettings = {
   visualizerIntensity: 1.0
 };
 
-export const useVibeStore = create<VibeState>((set, get) => ({
+export const useVibeStore = create<VibeState>()(
+  subscribeWithSelector((set, get) => ({
   // Settings
   settings: DEFAULT_SETTINGS,
   updateSettings: (partial) => set((state) => ({ settings: { ...state.settings, ...partial } })),
@@ -101,4 +103,4 @@ export const useVibeStore = create<VibeState>((set, get) => ({
   exportProgress: 0,
   exportStatus: '',
   setExportState: (isExporting, progress = 0, status = '') => set({ isExporting, exportProgress: progress, exportStatus: status }),
-}));
+})));
