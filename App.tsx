@@ -38,11 +38,17 @@ const App: React.FC = () => {
   const updateSettings = useVibeStore((s) => s.updateSettings);
   const backgroundImage = useVibeStore((s) => s.backgroundImage);
   const setBackgroundImage = useVibeStore((s) => s.setBackgroundImage);
+  const initializeStore = useVibeStore((s) => s.initialize);
   
   const [isCinemaMode, setIsCinemaMode] = React.useState<boolean>(false);
   const [isExporting, setIsExporting] = React.useState<boolean>(false);
   const [exportProgress, setExportProgress] = React.useState<number>(0);
   const [exportStatus, setExportStatus] = React.useState<string>("");
+
+  // Initialize Store
+  useEffect(() => {
+      initializeStore();
+  }, []);
 
   // Listen for backend progress events
   useEffect(() => {
