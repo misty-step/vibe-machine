@@ -17,6 +17,7 @@
     "@fontsource/montserrat": "^5.2.8",
     "@fontsource/playfair-display": "^5.2.8",
     "@fontsource/roboto-slab": "^5.2.8",
+    "@tauri-apps/plugin-store": "^2.4.1",
     "lucide-react": "^0.556.0",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",

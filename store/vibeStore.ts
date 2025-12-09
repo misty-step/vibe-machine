@@ -1,8 +1,14 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
+import { LazyStore } from '@tauri-apps/plugin-store';
 import { VibeSettings, VisualizerMode, AspectRatio, FontFamily, FontSize, Track } from '../types';
 
+const settingsStore = new LazyStore('settings.json');
+
 interface VibeState {
+  // Initialization
+  initialize: () => Promise<void>;
+
   // Settings
   settings: VibeSettings;
   updateSettings: (partial: Partial<VibeSettings>) => void;
@@ -51,6 +57,28 @@ const DEFAULT_SETTINGS: VibeSettings = {
 
 export const useVibeStore = create<VibeState>()(
   subscribeWithSelector((set, get) => ({
+  // Initialization
+  initialize: async () => {
+      try {
+          const savedSettings = await settingsStore.get<VibeSettings>('settings');
+          if (savedSettings) {
+              // Merge with default to ensure new keys exist
+              set({ settings: { ...DEFAULT_SETTINGS, ...savedSettings } });
+          }
+      } catch (e) {
+          console.warn("Failed to load settings:", e);
+      }
+
+      // Auto-save subscription
+      useVibeStore.subscribe(
+          (state) => state.settings,
+          (settings) => {
+              settingsStore.set('settings', settings);
+              settingsStore.save();
+          }
+      );
+  },
+
   // Settings
   settings: DEFAULT_SETTINGS,
   updateSettings: (partial) => set((state) => ({ settings: { ...state.settings, ...partial } })),
