@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="plasma" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffb703"/>
+      <stop offset="100%" stop-color="#fb8500"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="10" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Background Container -->
+  <rect width="512" height="512" rx="128" fill="#030304"/>
+  
+  <!-- The Vibe "V" -->
+  <path d="M130 130 L256 410 L382 130" 
+        fill="none" 
+        stroke="url(#plasma)" 
+        stroke-width="72" 
+        stroke-linecap="round" 
+        stroke-linejoin="round"
+        filter="url(#glow)"
+  />
+</svg>
