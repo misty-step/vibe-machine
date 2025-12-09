@@ -24,12 +24,6 @@ const ViewfinderOverlay: React.FC = () => (
         <div className="absolute top-1/2 right-4 w-2 h-px bg-white/20"></div>
         <div className="absolute top-4 left-1/2 w-px h-2 bg-white/20"></div>
         <div className="absolute bottom-4 left-1/2 w-px h-2 bg-white/20"></div>
-
-        {/* REC Indicator */}
-        <div className="absolute top-4 right-4 flex items-center gap-2">
-            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.6)]"></div>
-            <span className="text-[10px] font-mono text-red-500 font-bold tracking-widest">REC_READY</span>
-        </div>
     </div>
 );
 
