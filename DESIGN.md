@@ -1,116 +1,96 @@
-# DESIGN.md: Native High-Performance Video Export
+# DESIGN.md: Vibe Machine (Tauri/Rust Edition)
 
-> "Complexity is anything that makes software hard to understand or modify." — John Ousterhout
+> "Don't fight the platform. Use the kernel." — Linus Torvalds
 
 ## 1. Executive Summary
 
-**Problem:** Vibe Machine currently lacks a viable export mechanism. `canvas.captureStream()` is nondeterministic, prone to desync, and typically limited to WebM (poor ecosystem support).
-**Goal:** Implement a **deterministic offline rendering pipeline** that produces broadcast-quality **MP4 (H.264 + AAC)** video files client-side.
-**Philosophy:** Deep Modules. The complexity of frame scheduling, encoding, and muxing must be completely hidden behind a simple `render()` interface.
+**Pivot:** We are abandoning the "Browser-only" constraint. Vibe Machine is being reborn as a **native desktop application** using **Tauri**.
+**Goal:** Create a professional-grade creator tool capable of rendering 4K/60fps long-form videos without memory crashes.
+**Core Philosophy:** The "Engine" moves to Rust. The "UI" stays in React. We share logic via WebAssembly (WASM).
 
-## 2. Architecture: The Offline Pipeline
+## 2. The "Holy Grail" Architecture
 
-We will move away from "recording what you see" (screen capture) to "rendering what you want" (deterministic generation).
-
-### The High-Level Flow
+To ensure 1:1 parity between the **Live Preview** (React) and the **Offline Export** (Rust), we will implement the core visualization logic **once** in Rust and compile it for two targets.
 
 ```mermaid
 graph TD
-    A[User Clicks Export] --> B[VideoRenderer Module]
-    B --> C{Parallel Processes}
-    C -->|Audio| D[OfflineAudioContext]
-    C -->|Video| E[Frame Scheduler]
-    D --> F[AudioEncoder (AAC)]
-    E --> G[Visualizer Engine (Pure)]
-    G --> H[OffscreenCanvas]
-    H --> I[VideoFrame]
-    I --> J[VideoEncoder (H.264)]
-    F --> K[MP4 Muxer]
-    J --> K
-    K --> L[Final Blob]
+    subgraph "Shared Core (Rust)"
+        VE[Vibe Engine Crate]
+        VE -->|Compile| WASM[vibe_engine.wasm]
+        VE -->|Compile| LIB[vibe_engine.lib]
+    end
+
+    subgraph "Frontend (Tauri Window)"
+        React[React UI]
+        React -->|Load| WASM
+        WASM -->|Draw| Canvas[HTML5 Canvas (Preview)]
+        React -->|IPC: Invoke| Tauri
+    end
+
+    subgraph "Backend (System Process)"
+        Tauri[Tauri Main]
+        Tauri -->|Link| LIB
+        LIB -->|Frames| Encoder[FFmpeg / Video-RS]
+        Encoder -->|Write| Disk[MP4 File]
+    end
 ```
 
 ### Key Modules
 
-#### 1. `VisualizerEngine` (Refactored)
-*   **Current State:** `Visualizer.tsx` is a React component tightly coupled to DOM and real-time `Date.now()`.
-*   **New Design:** A framework-agnostic class `VisualizerCore`.
-    *   **Input:** `CanvasContext`, `AudioAnalysisData`, `Settings`, `Time`.
-    *   **Output:** Draw commands to context.
-    *   **Trait:** Idempotent. Calling `draw(t=5.0)` always produces the exact same pixel output.
+#### 1. `vibe-engine` (The Deepest Module)
+*   **Language:** Rust.
+*   **Responsibility:** Pure arithmetic and drawing.
+*   **Inputs:** `AudioData (FFT)`, `BackgroundImage (Pixels)`, `Settings`, `Time`.
+*   **Output:** `FrameBuffer (RGBA)`.
+*   **Trait:** Pure function. `f(state, time) -> pixels`.
 
-#### 2. `AudioCompositor`
-*   **Responsibility:** Prepares the audio mix for both playback and export.
-*   **Implementation:**
-    *   **Realtime:** Uses `AudioContext`.
-    *   **Offline:** Uses `OfflineAudioContext`.
-    *   **Shared Logic:** Both contexts share the same graph construction logic (Source -> Analyser -> Gain -> Dest).
+#### 2. `vibe-desktop` (The Shell)
+*   **Framework:** Tauri v2.
+*   **Responsibility:** Window management, File I/O, System Integration.
+*   **Render Pipeline:**
+    *   Spawns a dedicated Render Thread.
+    *   Loads audio file via `symphonia` (Rust audio decoding).
+    *   Runs the `vibe-engine` loop.
+    *   Pipes output to `ffmpeg` (bundled sidecar) for broadcast-grade encoding.
 
-#### 3. `VideoRenderer` (The Deep Module)
-*   **Interface:**
-    ```typescript
-    interface RenderOptions {
-      width: number;
-      height: number;
-      fps: number;
-      bitrate: number;
-    }
-    
-    function renderProject(
-      playlist: Track[], 
-      settings: VibeSettings, 
-      options: RenderOptions,
-      onProgress: (p: number) => void
-    ): Promise<Blob>;
-    ```
-*   **Internals:**
-    *   Manages the `WebCodecs` `VideoEncoder` and `AudioEncoder`.
-    *   Feeds data into `mp4-muxer`.
-    *   Controls the "Time Loop" (stepping `t += 1/fps`).
+#### 3. `vibe-ui` (The Face)
+*   **Framework:** React + Vite.
+*   **Responsibility:** User interaction, Settings configuration.
+*   **Preview:** Uses `vibe-engine` (WASM) to draw to a canvas at 60fps for immediate feedback.
 
-## 3. Technology Stack Decisions
+## 3. Why This Wins
+
+1.  **Performance:** Rust handles the heavy lifting (Audio FFT, Pixel manipulation) on the metal.
+2.  **Stability:** No browser OOM (Out of Memory) crashes. We manage our own buffers.
+3.  **Quality:** Access to `ffmpeg` means we can export ProRes, DNxHD, or 50mbps H.264—formats browsers dream of.
+4.  **Consistency:** By sharing the Rust core via WASM, the preview looks *exactly* like the export.
+
+## 4. Stack Selection
 
 | Component | Choice | Rationale |
 | :--- | :--- | :--- |
-| **Video Encoding** | **WebCodecs API** | Native performance (hardware acceleration), precise frame control. Beats WASM in speed. |
-| **Container** | **mp4-muxer** | Lightweight (pure TS), specialized for WebCodecs. Avoids 20MB+ ffmpeg.wasm payload. |
-| **Audio Processing** | **OfflineAudioContext** | The only way to guarantee 100% sync. Renders audio faster than realtime. |
-| **Canvas** | **OffscreenCanvas** | Decouples rendering from the main thread UI. (Future proofing for WebWorker). |
+| **App Framework** | **Tauri v2** | Tiny footprint, secure, modern. |
+| **Core Lang** | **Rust** | Performance, safety, WASM support. |
+| **Graphics** | **Raqote** or **Skia** | 2D drawing libraries for Rust. (Raqote is pure Rust, simpler for WASM). |
+| **Audio Decode** | **Symphonia** | Pure Rust audio decoding (WAV, MP3, FLAC, AAC). |
+| **Video Encode** | **FFmpeg (Sidecar)** | The industry standard. Unbeatable compatibility. |
 
-## 4. Implementation Steps
+## 5. Migration Strategy
 
-### Phase 1: The "Pure" Refactor (Complexity Debt Repayment)
-Before we can render, we must untangle the visualizer.
-1.  Extract `VisualizerCore` logic out of `Visualizer.tsx`.
-2.  Ensure `physicsState` (attack/decay) can be calculated deterministically (step-based simulation vs time-delta simulation).
-3.  **Deliverable:** `Visualizer.tsx` becomes a thin wrapper around `VisualizerCore`.
+We are not "refactoring" the JS code; we are **replacing** the engine.
 
-### Phase 2: The Audio Engine
-1.  Create `useAudioEngine` hook.
-2.  Abstract graph creation so it can accept `OfflineAudioContext`.
-3.  Implement `getAudioData(file)` to decode files into buffers (required for Offline context).
+1.  **Freeze React:** The current UI is good. Keep it.
+2.  **Initialize Tauri:** Wrap the existing React app.
+3.  **Forge the Engine:** Write `vibe-engine` in Rust.
+4.  **Wire WASM:** Replace `VisualizerCore.ts` with calls to `vibe-engine.wasm`.
+5.  **Wire Native:** Implement the export command in Tauri using the same engine.
 
-### Phase 3: The Renderer
-1.  Scaffold `VideoRenderer` class.
-2.  Implement `WebCodecs` initialization (check `isConfigSupported`).
-3.  Implement the Main Loop:
-    *   `for (let t = 0; t < duration; t += 1/fps)`
-    *   `analyser.getByteFrequencyData` (Mocking this in offline mode is tricky; we need to pre-analyze the audio buffer using `ScriptProcessor` or pre-compute FFT data).
-    *   **Correction:** `OfflineAudioContext` *can* provide an `AnalyserNode` but it only works during the `startRendering()` promise execution or via `ScriptProcessor`. 
-    *   **Better Approach:** Pre-compute the Frequency Data for the entire track into a big array `Float32Array[]` before video rendering starts. This ensures fast lookups during the video loop.
+## 6. Risk Assessment
 
-### Phase 4: Integration
-1.  Wire up the "Export" button.
-2.  Add progress UI.
+*   **Complexity:** Setting up the Rust -> WASM -> JS bridge is non-trivial.
+*   **Build Size:** Bundling FFmpeg increases installer size (but is worth it).
+*   **Learning Curve:** Rust ownership model.
 
-## 5. Risk Assessment
-
-*   **Memory Pressure:** 4K rendering @ 60fps generates massive data. We must ensure `VideoFrame.close()` is called immediately after encoding.
-*   **Browser Support:** WebCodecs is widely supported (Chrome, Edge, Safari 15.4+, Firefox 130+). We need a graceful fallback (basic `MediaRecorder` WebM) or a "Browser not supported" toast.
-*   **FFT Synchronization:** Getting the exact FFT data for frame `N` requires mapping `time -> sample_index`.
-
-## 6. Ousterhout Review
-*   **Deep Module?** Yes. Interface is simple `render()`, implementation handles codecs/sync.
-*   **Information Hiding?** Yes. React components know nothing about H.264.
-*   **Strategic Programming?** Yes. We are building a foundational engine, not a quick hack.
-
+## 7. Ousterhout Review
+*   **Deep Module:** `vibe-engine` is the ultimate deep module. Complex math inside, simple `draw_frame()` API outside.
+*   **Strategic:** We solve the performance problem forever, not just for today.
