@@ -3,11 +3,13 @@ import { Icons } from './components/Icons';
 import Visualizer from './components/Visualizer';
 import { AspectRatio, VisualizerMode, FontFamily, FontSize } from './types';
 import { useVibeEngine } from './hooks/useVibeEngine';
-import { VideoRenderer } from './components/VideoRenderer';
 import { Sidebar } from './components/Sidebar';
 import { PlayerControls } from './components/PlayerControls';
 import { useVibeStore } from './store/vibeStore';
 import { useObjectUrl } from './hooks/useObjectUrl';
+import { invoke } from '@tauri-apps/api/core';
+import { save } from '@tauri-apps/api/dialog';
+import { listen } from '@tauri-apps/api/event';
 
 // --- Subcomponents ---
 
@@ -42,6 +44,18 @@ const App: React.FC = () => {
   const [exportProgress, setExportProgress] = React.useState<number>(0);
   const [exportStatus, setExportStatus] = React.useState<string>("");
 
+  // Listen for backend progress events
+  useEffect(() => {
+      const unlisten = listen<{ progress: number; status: string }>('export-progress', (event) => {
+          setExportProgress(Math.round(event.payload.progress * 100));
+          setExportStatus(event.payload.status);
+      });
+      
+      return () => {
+          unlisten.then(f => f());
+      };
+  }, []);
+
   // --- Handlers ---
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'audio' | 'image') => {
     if (e.target.files && e.target.files.length > 0) {
@@ -74,7 +88,7 @@ const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [engine]);
 
-  // Export Logic
+  // Export Logic (Native)
   const handleExport = async () => {
     if (engine.playlist.length === 0) {
         alert("Please add at least one audio track to export.");
@@ -82,42 +96,61 @@ const App: React.FC = () => {
     }
 
     try {
+        // 1. Pick Output Path
+        const outputPath = await save({
+            filters: [{
+                name: 'Video',
+                extensions: ['mp4']
+            }]
+        });
+        
+        if (!outputPath) return; // Cancelled
+
         setIsExporting(true);
         setExportProgress(0);
-        setExportStatus("Initializing...");
-
-        const renderer = new VideoRenderer();
+        setExportStatus("Initializing Native Forge...");
         
+        // 2. Determine Resolution
         let width = 1920;
         let height = 1080;
         if (settings.aspectRatio === AspectRatio.OneOne) { width = 1080; height = 1080; }
         else if (settings.aspectRatio === AspectRatio.NineSixteen) { width = 1080; height = 1920; }
 
-        const blob = await renderer.renderProject(
-            engine.playlist,
-            settings,
-            backgroundImage,
-            {
-                width,
-                height,
-                fps: 30,
-                bitrate: 6_000_000 
-            },
-            (progress, status) => {
-                setExportProgress(Math.min(100, Math.round(progress * 100)));
-                setExportStatus(status);
-            }
-        );
-
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = "vibe_export.mp4";
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
+        // 3. Send Command to Rust
+        // Note: We need to send the file path, not the blob URL, for Rust to read it.
+        // The Track interface in the store currently holds 'File' objects.
+        // In a Tauri context, File objects often expose the real path.
+        // Let's try to access 'path' property (standard in Electron/Tauri file inputs).
+        // If not, we might need to read the file into a buffer and send bytes (slower).
+        // Let's assume `webUtils` or standard behavior gives us a path.
         
+        // Currently, Track has `file: File`.
+        // We need to extract the path.
+        
+        // Hack: Cast File to any to access .path (Tauri feature)
+        // Ideally we should type this in `types.ts`.
+        const track = engine.playlist[0]; // Multi-track support TODO in backend
+        const audioPath = (track.file as any).path; 
+        
+        if (!audioPath) {
+            throw new Error("Could not determine file path. Are you running in Tauri?");
+        }
+
+        await invoke('export_video', {
+            audioPath,
+            imagePath: "", // Todo: Handle image path similarly
+            outputPath,
+            settings: {
+                // Map TS settings to Rust VibeSettings
+                visualizer_mode: settings.visualizerMode,
+                visualizer_color: settings.visualizerColor,
+                visualizer_intensity: settings.visualizerIntensity
+            },
+            fps: 30,
+            width,
+            height
+        });
+
         setExportStatus("Done!");
         setTimeout(() => {
              setIsExporting(false);
@@ -126,8 +159,8 @@ const App: React.FC = () => {
 
     } catch (error) {
         console.error("Export failed:", error);
-        setExportStatus("Error: " + (error as Error).message);
-        alert("Export failed. Check console for details.");
+        setExportStatus("Error: " + (error as any).toString());
+        alert("Export failed: " + (error as any).toString());
         setIsExporting(false);
     }
   };
