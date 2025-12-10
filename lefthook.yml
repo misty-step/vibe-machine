@@ -1,0 +1,16 @@
+pre-commit:
+  parallel: true
+  commands:
+    format:
+      glob: "*.{ts,tsx,js,json,css,md}"
+      run: pnpm prettier --write {staged_files} && git add {staged_files}
+    lint:
+      glob: "*.{ts,tsx}"
+      run: pnpm eslint --fix {staged_files}
+
+pre-push:
+  commands:
+    type-check:
+      run: pnpm type-check
+    rust-check:
+      run: cargo check --manifest-path=src-tauri/Cargo.toml

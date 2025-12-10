@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 
 /**
  * A hook that manages the lifecycle of an Object URL for a given File or Blob.

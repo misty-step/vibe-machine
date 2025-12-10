@@ -25,7 +25,7 @@
 body {
   background-color: #030304; /* Void */
   color: #e4e4e7;
-  font-family: 'Geist Sans', sans-serif;
+  font-family: "Geist Sans", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -35,7 +35,7 @@ body {
   .text-balance {
     text-wrap: balance;
   }
-  
+
   /* Holographic Industrial Utilities */
   .glass-panel {
     @apply bg-carbon/80 backdrop-blur-xl border border-white/5 shadow-inner-light;

@@ -1,0 +1,12 @@
+# Build outputs
+dist
+node_modules
+src/vibe-engine-wasm
+
+# Rust targets
+**/target
+src-tauri/gen
+
+# Generated files
+*.tsbuildinfo
+pnpm-lock.yaml
