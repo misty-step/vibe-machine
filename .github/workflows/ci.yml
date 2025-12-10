@@ -19,7 +19,14 @@ jobs:
           node-version: 22
           cache: "pnpm"
 
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
       - run: pnpm install
+
+      - name: Build WASM
+        run: pnpm build:wasm
 
       - name: Format check
         run: pnpm format:check
