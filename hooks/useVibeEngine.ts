@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { AudioSystem } from '../engine/AudioSystem';
 import { useVibeStore } from '../store/vibeStore';
 
@@ -21,8 +21,6 @@ export const useVibeEngine = () => {
   useEffect(() => {
       AudioSystem.getInstance();
   }, []);
-  
-  const audioElRef = useRef<HTMLAudioElement | null>(null);
 
   // Legacy Adapter for App.tsx
   // We simulate the old hook's return signature to make the refactor easier
@@ -61,7 +59,6 @@ export const useVibeEngine = () => {
     playPause: () => useVibeStore.getState().setIsPlaying(!isPlaying),
     selectTrack: (idx: number) => selectTrack(playlist[idx]?.id || null),
     nextTrack: selectNextTrack,
-    prevTrack: selectPrevTrack,
-    audioElRef // This is now vestigial, AudioSystem manages its own element
+    prevTrack: selectPrevTrack
   };
 };
