@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Rust build artifacts
+**/target/
+
+# TypeScript incremental build
+*.tsbuildinfo
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
