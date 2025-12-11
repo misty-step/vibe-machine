@@ -17,17 +17,25 @@ struct ExportProgress {
     status: String,
 }
 
-#[tauri::command]
-async fn export_video(
-    app: tauri::AppHandle,
+#[derive(serde::Deserialize)]
+struct ExportParams {
     audio_path: String,
-    _image_path: String, // Background image not yet wired for native export
+    #[serde(default)]
+    #[allow(dead_code)] // Not yet wired for native export
+    image_path: String,
     output_path: String,
     settings: VibeSettings,
     fps: u32,
     width: i32,
     height: i32,
+}
+
+#[tauri::command]
+async fn export_video(
+    app: tauri::AppHandle,
+    params: ExportParams,
 ) -> Result<(), String> {
+    let ExportParams { audio_path, output_path, settings, fps, width, height, .. } = params;
     let start_time = std::time::Instant::now();
 
     // 1. Setup Audio Decoding
@@ -167,7 +175,7 @@ fn build_fft_bins(window: &[f32], sample_rate: u32) -> Vec<u8> {
     let step = (data.len().max(FFT_BINS)) / FFT_BINS;
     let mut bins = vec![0u8; FFT_BINS];
 
-    for j in 0..FFT_BINS {
+    for (j, bin) in bins.iter_mut().enumerate() {
         let mut sum = 0.0;
         for k in 0..step {
             if let Some((_, val)) = data.get(j * step + k) {
@@ -175,8 +183,7 @@ fn build_fft_bins(window: &[f32], sample_rate: u32) -> Vec<u8> {
             }
         }
         let avg = sum / step as f32;
-        let scaled = (avg * 1000.0).min(255.0) as u8;
-        bins[j] = scaled;
+        *bin = (avg * 1000.0).min(255.0) as u8;
     }
 
     bins

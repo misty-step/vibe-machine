@@ -154,18 +154,20 @@ const App: React.FC = () => {
       }
 
       await invoke("export_video", {
-        audioPath,
-        imagePath: "", // Todo: Handle image path similarly
-        outputPath,
-        settings: {
-          // Map TS settings to Rust VibeSettings
-          visualizer_mode: settings.visualizerMode,
-          visualizer_color: settings.visualizerColor,
-          visualizer_intensity: settings.visualizerIntensity,
+        params: {
+          audio_path: audioPath,
+          image_path: "", // Todo: Handle image path similarly
+          output_path: outputPath,
+          settings: {
+            // Map TS settings to Rust VibeSettings
+            visualizer_mode: settings.visualizerMode,
+            visualizer_color: settings.visualizerColor,
+            visualizer_intensity: settings.visualizerIntensity,
+          },
+          fps: 30,
+          width,
+          height,
         },
-        fps: 30,
-        width,
-        height,
       });
 
       setExportStatus("Done!");
