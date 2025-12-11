@@ -27,6 +27,7 @@ cd crates/vibe-engine && wasm-pack build --target web --out-dir ../../src/vibe-e
 ## Architecture
 
 ### The "Holy Grail" Pattern
+
 Same Rust code powers both preview and export:
 
 ```
@@ -37,15 +38,15 @@ vibe-engine (Rust crate)
 
 ### Key Modules
 
-| Path | Purpose |
-|------|---------|
-| `crates/vibe-engine/` | Pure Rust visualizer - `f(state, freq_data) → pixels` |
-| `src-tauri/src/lib.rs` | Tauri commands, FFmpeg piping, audio decode (Symphonia) |
-| `App.tsx` | Orchestrator: Web Audio API, file handling, UI shell |
-| `components/VisualizerCore.ts` | WASM bridge, canvas rendering loop |
-| `components/Visualizer.tsx` | React wrapper for canvas |
-| `store/vibeStore.ts` | Zustand store with Tauri plugin-store persistence |
-| `types.ts` | Shared TS types (Track, VibeSettings, enums) |
+| Path                           | Purpose                                                 |
+| ------------------------------ | ------------------------------------------------------- |
+| `crates/vibe-engine/`          | Pure Rust visualizer - `f(state, freq_data) → pixels`   |
+| `src-tauri/src/lib.rs`         | Tauri commands, FFmpeg piping, audio decode (Symphonia) |
+| `App.tsx`                      | Orchestrator: Web Audio API, file handling, UI shell    |
+| `components/VisualizerCore.ts` | WASM bridge, canvas rendering loop                      |
+| `components/Visualizer.tsx`    | React wrapper for canvas                                |
+| `store/vibeStore.ts`           | Zustand store with Tauri plugin-store persistence       |
+| `types.ts`                     | Shared TS types (Track, VibeSettings, enums)            |
 
 ### Data Flow
 
@@ -61,6 +62,7 @@ vibe-engine (Rust crate)
 ## Design System
 
 "Holographic Industrial" aesthetic per DESIGN_SYSTEM.md:
+
 - **Void**: `#030304` (deepest background)
 - **Carbon**: `#0a0a0b` (component surfaces)
 - **Plasma**: `#ffb703` (primary accent)

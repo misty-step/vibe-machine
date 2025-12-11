@@ -1,11 +1,11 @@
-import { useEffect } from 'react';
-import { AudioSystem } from '../engine/AudioSystem';
-import { useVibeStore } from '../store/vibeStore';
+import { useEffect } from "react";
+import { AudioSystem } from "../engine/AudioSystem";
+import { useVibeStore } from "../store/vibeStore";
 
 export const useVibeEngine = () => {
-  const { 
-    playlist, 
-    currentTrackId, 
+  const {
+    playlist,
+    currentTrackId,
     isPlaying,
     addTracks,
     removeTrack,
@@ -14,51 +14,51 @@ export const useVibeEngine = () => {
     selectNextTrack,
     selectPrevTrack,
     currentTime,
-    duration
+    duration,
   } = useVibeStore();
 
   // Ensure AudioSystem is initialized
   useEffect(() => {
-      AudioSystem.getInstance();
+    AudioSystem.getInstance();
   }, []);
 
   // Legacy Adapter for App.tsx
   // We simulate the old hook's return signature to make the refactor easier
   return {
     playlist,
-    currentTrackIndex: playlist.findIndex(t => t.id === currentTrackId),
-    currentTrack: playlist.find(t => t.id === currentTrackId) || null,
+    currentTrackIndex: playlist.findIndex((t) => t.id === currentTrackId),
+    currentTrack: playlist.find((t) => t.id === currentTrackId) || null,
     isPlaying,
     currentTime,
     duration,
     analyser: AudioSystem.getInstance().getAnalyser(),
     addTracks: async (files: File[]) => {
-        // Convert File[] to Track[] logic is needed here or in store
-        const { generateId, getAudioDuration } = await import('../utils');
-        const tracks = [];
-        for (const file of files) {
-            const duration = await getAudioDuration(file);
-            tracks.push({
-                id: generateId(),
-                file,
-                name: file.name.replace(/\.[^/.]+$/, ""),
-                artist: '',
-                duration
-            });
-        }
-        
-        const wasEmpty = useVibeStore.getState().playlist.length === 0;
-        addTracks(tracks);
-        
-        if (wasEmpty && tracks.length > 0) {
-            selectTrack(tracks[0].id);
-        }
+      // Convert File[] to Track[] logic is needed here or in store
+      const { generateId, getAudioDuration } = await import("../utils");
+      const tracks = [];
+      for (const file of files) {
+        const duration = await getAudioDuration(file);
+        tracks.push({
+          id: generateId(),
+          file,
+          name: file.name.replace(/\.[^/.]+$/, ""),
+          artist: "",
+          duration,
+        });
+      }
+
+      const wasEmpty = useVibeStore.getState().playlist.length === 0;
+      addTracks(tracks);
+
+      if (wasEmpty && tracks.length > 0) {
+        selectTrack(tracks[0].id);
+      }
     },
     removeTrack,
     updateTrackInfo,
     playPause: () => useVibeStore.getState().setIsPlaying(!isPlaying),
     selectTrack: (idx: number) => selectTrack(playlist[idx]?.id || null),
     nextTrack: selectNextTrack,
-    prevTrack: selectPrevTrack
+    prevTrack: selectPrevTrack,
   };
 };

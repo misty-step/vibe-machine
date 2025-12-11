@@ -1,11 +1,10 @@
-import React from 'react';
-import { 
-  Play, 
-  Pause, 
-  SkipForward, 
-  SkipBack, 
-  Upload, 
-  Music, 
+import {
+  Play,
+  Pause,
+  SkipForward,
+  SkipBack,
+  Upload,
+  Music,
   Image as ImageIcon,
   Settings,
   Download,
@@ -20,8 +19,8 @@ import {
   Disc,
   Maximize2,
   ChevronDown,
-  BarChart2
-} from 'lucide-react';
+  BarChart2,
+} from "lucide-react";
 
 export const Icons = {
   Play,
@@ -45,5 +44,5 @@ export const Icons = {
   Disc,
   Maximize: Maximize2,
   ChevronDown,
-  BarChart2
+  BarChart2,
 };
