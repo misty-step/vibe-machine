@@ -2,13 +2,22 @@ name: Release
 
 on:
   push:
-    tags: ["v*"]
+    branches: [master]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: macos-latest
+    # Skip release commits to prevent infinite loop
+    if: "!contains(github.event.head_commit.message, '[skip release]')"
     steps:
       - uses: actions/checkout@v4
+
+      - name: Generate version
+        id: version
+        run: |
+          VERSION="v0.1.0-$(date -u +%Y%m%d.%H%M%S)"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - uses: pnpm/action-setup@v4
 
@@ -31,8 +40,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: "Vibe Machine ${{ github.ref_name }}"
+          tagName: ${{ steps.version.outputs.version }}
+          releaseName: "Vibe Machine ${{ steps.version.outputs.version }}"
           releaseBody: "Download the .dmg and drag to Applications."
           releaseDraft: false
           args: --target aarch64-apple-darwin

@@ -289,13 +289,20 @@
       <h1>Vibe<br />Machine</h1>
       <p class="tagline">Your music, rendered</p>
 
-      <a
-        class="cta"
-        href="https://github.com/misty-step/vibe-machine/releases/latest/download/vibe-machine_aarch64.dmg"
-      >
+      <a class="cta" id="download" href="https://github.com/misty-step/vibe-machine/releases">
         Download for Mac
       </a>
     </main>
+
+    <script>
+      fetch("https://api.github.com/repos/misty-step/vibe-machine/releases/latest")
+        .then((r) => r.json())
+        .then((release) => {
+          const dmg = release.assets?.find((a) => a.name.endsWith(".dmg"));
+          if (dmg) document.getElementById("download").href = dmg.browser_download_url;
+        })
+        .catch(() => {});
+    </script>
 
     <div class="links">
       <a href="https://mistystep.io" target="_blank" rel="noopener noreferrer"
