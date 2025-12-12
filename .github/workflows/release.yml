@@ -2,7 +2,7 @@ name: Release
 
 on:
   push:
-    tags: ['v*']
+    tags: ["v*"]
 
 jobs:
   build:
@@ -32,7 +32,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'Vibe Machine ${{ github.ref_name }}'
-          releaseBody: 'Download the .dmg and drag to Applications.'
+          releaseName: "Vibe Machine ${{ github.ref_name }}"
+          releaseBody: "Download the .dmg and drag to Applications."
           releaseDraft: false
           args: --target aarch64-apple-darwin
