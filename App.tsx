@@ -6,9 +6,7 @@ import { useVibeEngine } from "./hooks/useVibeEngine";
 import { Sidebar } from "./components/Sidebar";
 import { PlayerControls } from "./components/PlayerControls";
 import { useVibeStore } from "./store/vibeStore";
-import { invoke } from "@tauri-apps/api/core";
-import { save } from "@tauri-apps/plugin-dialog";
-import { listen } from "@tauri-apps/api/event";
+import { exportController } from "./export/ExportController";
 
 // --- Subcomponents ---
 
@@ -39,25 +37,25 @@ const App: React.FC = () => {
   const setBackgroundImage = useVibeStore((s) => s.setBackgroundImage);
   const initializeStore = useVibeStore((s) => s.initialize);
 
-  const [isCinemaMode, setIsCinemaMode] = React.useState<boolean>(false);
-  const [isExporting, setIsExporting] = React.useState<boolean>(false);
-  const [exportProgress, setExportProgress] = React.useState<number>(0);
-  const [exportStatus, setExportStatus] = React.useState<string>("");
+  // Export state from store (single source of truth)
+  const isExporting = useVibeStore((s) => s.isExporting);
+  const exportProgress = useVibeStore((s) => s.exportProgress);
+  const exportStatus = useVibeStore((s) => s.exportStatus);
 
-  // Initialize Store
+  const [isCinemaMode, setIsCinemaMode] = React.useState<boolean>(false);
+
+  // Initialize Store + Export progress listener
   useEffect(() => {
     initializeStore();
-  }, []);
 
-  // Listen for backend progress events
-  useEffect(() => {
-    const unlisten = listen<{ progress: number; status: string }>("export-progress", (event) => {
-      setExportProgress(Math.round(event.payload.progress * 100));
-      setExportStatus(event.payload.status);
+    // Attach export progress listener (handles Tauri check internally)
+    let cleanup: (() => void) | undefined;
+    exportController.attachProgressListener().then((unlisten) => {
+      cleanup = unlisten;
     });
 
     return () => {
-      unlisten.then((f) => f());
+      cleanup?.();
     };
   }, []);
 
@@ -98,89 +96,9 @@ const App: React.FC = () => {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [engine]);
 
-  // Export Logic (Native)
-  const handleExport = async () => {
-    if (engine.playlist.length === 0) {
-      alert("Please add at least one audio track to export.");
-      return;
-    }
-
-    try {
-      // 1. Pick Output Path
-      const outputPath = await save({
-        filters: [
-          {
-            name: "Video",
-            extensions: ["mp4"],
-          },
-        ],
-      });
-
-      if (!outputPath) return; // Cancelled
-
-      setIsExporting(true);
-      setExportProgress(0);
-      setExportStatus("Initializing Native Forge...");
-
-      // 2. Determine Resolution
-      let width = 1920;
-      let height = 1080;
-      if (settings.aspectRatio === AspectRatio.OneOne) {
-        width = 1080;
-        height = 1080;
-      } else if (settings.aspectRatio === AspectRatio.NineSixteen) {
-        width = 1080;
-        height = 1920;
-      }
-
-      // 3. Send Command to Rust
-      // Note: We need to send the file path, not the blob URL, for Rust to read it.
-      // The Track interface in the store currently holds 'File' objects.
-      // In a Tauri context, File objects often expose the real path.
-      // Let's try to access 'path' property (standard in Electron/Tauri file inputs).
-      // If not, we might need to read the file into a buffer and send bytes (slower).
-      // Let's assume `webUtils` or standard behavior gives us a path.
-
-      // Currently, Track has `file: File`.
-      // We need to extract the path.
-
-      // Hack: Cast File to any to access .path (Tauri feature)
-      // Ideally we should type this in `types.ts`.
-      const track = engine.playlist[0]; // Multi-track support TODO in backend
-      const audioPath = (track.file as any).path;
-
-      if (!audioPath) {
-        throw new Error("Could not determine file path. Are you running in Tauri?");
-      }
-
-      await invoke("export_video", {
-        params: {
-          audio_path: audioPath,
-          image_path: "", // Todo: Handle image path similarly
-          output_path: outputPath,
-          settings: {
-            // Map TS settings to Rust VibeSettings
-            visualizer_mode: settings.visualizerMode,
-            visualizer_color: settings.visualizerColor,
-            visualizer_intensity: settings.visualizerIntensity,
-          },
-          fps: 30,
-          width,
-          height,
-        },
-      });
-
-      setExportStatus("Done!");
-      setTimeout(() => {
-        setIsExporting(false);
-        setExportProgress(0);
-      }, 3000);
-    } catch (error) {
-      console.error("Export failed:", error);
-      setExportStatus("Error: " + (error as any).toString());
-      alert("Export failed: " + (error as any).toString());
-      setIsExporting(false);
-    }
+  // Export via controller (dialogs + IPC + store state)
+  const handleExport = () => {
+    exportController.startExport();
   };
 
   return (
