@@ -7,41 +7,6 @@
 
 ## NOW (This Week)
 
-### Critical: Dead Code Removal ✓
-
-**Flagged by: 5+ agents** | Complexity: Low | Impact: High
-
-- [x] Delete `hooks/useAudioEngine.ts` (250 lines) - never imported, replaced by AudioSystem singleton
-- [x] Delete `engine/RenderSystem.ts` (109 lines) - never used, Visualizer.tsx uses inline RAF loop
-- [x] Remove vestigial `audioElRef` from useVibeEngine return
-
-### Critical: Security Fix
-
-**Flagged by: security-sentinel, torvalds** | Complexity: Low | Impact: Critical
-
-- [ ] Fix path traversal risk in `App.tsx:125` - `(track.file as any).path` hack
-  - Use Tauri's `path` module to resolve/validate file paths safely
-  - Add path canonicalization before FFmpeg handoff
-
-### Critical: State Duplication
-
-**Flagged by: 4 agents** | Complexity: Medium | Impact: High
-
-- [ ] Remove `isExporting` local state in App.tsx - use store's `exportProgress` exclusively
-- [ ] Single source of truth for export state
-
-### Foundation: Test Infrastructure ✓
-
-**Flagged by: beck, fowler, 3 others** | Complexity: Low | Impact: High
-
-- [x] Install Vitest + @vitest/coverage-v8
-- [x] Add first smoke test (types export correctly)
-- [ ] Add Rust tests for vibe-engine (currently zero)
-
----
-
-## NEXT (This Sprint)
-
 ### Architecture: Parameter Object Refactor
 
 **Flagged by: ousterhout, fowler, carmack** | Complexity: Medium | Impact: Medium
