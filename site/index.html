@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VIBE MACHINE</title>
+  <meta name="description" content="Cinematic audio visualization for macOS. Your music, rendered.">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap');
+
+    :root {
+      --void: #030304;
+      --carbon: #0a0a0b;
+      --plasma: #ffb703;
+      --flux: #0ea5e9;
+      --glass: rgba(255,255,255,0.06);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      background: var(--void);
+      color: #e4e4e7;
+      font-family: ui-monospace, 'SF Mono', monospace;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Animated grid background */
+    .grid-bg {
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(var(--flux) 1px, transparent 1px),
+        linear-gradient(90deg, var(--flux) 1px, transparent 1px);
+      background-size: 60px 60px;
+      opacity: 0.08;
+      animation: grid-drift 20s linear infinite;
+      transform-origin: center;
+    }
+
+    @keyframes grid-drift {
+      0% { transform: perspective(500px) rotateX(60deg) translateY(0); }
+      100% { transform: perspective(500px) rotateX(60deg) translateY(60px); }
+    }
+
+    /* Scan line overlay */
+    .scanlines {
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.15) 2px,
+        rgba(0,0,0,0.15) 4px
+      );
+      pointer-events: none;
+      z-index: 100;
+    }
+
+    /* Vignette */
+    .vignette {
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(ellipse at center, transparent 40%, var(--void) 100%);
+      pointer-events: none;
+      z-index: 50;
+    }
+
+    /* HUD corners */
+    .hud {
+      position: fixed;
+      font-size: 10px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--flux);
+      opacity: 0.6;
+      z-index: 10;
+    }
+    .hud-tl { top: 20px; left: 20px; }
+    .hud-tr { top: 20px; right: 20px; text-align: right; }
+    .hud-bl { bottom: 20px; left: 20px; }
+    .hud-br { bottom: 20px; right: 20px; text-align: right; }
+
+    .hud span { display: block; margin: 4px 0; }
+    .hud .highlight { color: var(--plasma); }
+
+    /* Main content */
+    main {
+      position: relative;
+      z-index: 10;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      text-align: center;
+    }
+
+    h1 {
+      font-family: 'Archivo Black', system-ui, sans-serif;
+      font-size: clamp(3rem, 15vw, 12rem);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 0.9;
+      text-transform: uppercase;
+      color: #fff;
+      text-shadow:
+        0 0 60px rgba(14, 165, 233, 0.4),
+        0 0 120px rgba(14, 165, 233, 0.2);
+      animation: title-pulse 4s ease-in-out infinite;
+    }
+
+    @keyframes title-pulse {
+      0%, 100% {
+        text-shadow:
+          0 0 60px rgba(14, 165, 233, 0.4),
+          0 0 120px rgba(14, 165, 233, 0.2);
+      }
+      50% {
+        text-shadow:
+          0 0 80px rgba(255, 183, 3, 0.5),
+          0 0 160px rgba(255, 183, 3, 0.25);
+      }
+    }
+
+    .tagline {
+      font-size: 0.875rem;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: #71717a;
+      margin-top: 1.5rem;
+      margin-bottom: 3rem;
+    }
+
+    .cta {
+      display: inline-block;
+      background: transparent;
+      color: var(--plasma);
+      font-family: inherit;
+      font-size: 0.875rem;
+      font-weight: 500;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      text-decoration: none;
+      padding: 1.25rem 3rem;
+      border: 1px solid var(--plasma);
+      position: relative;
+      overflow: hidden;
+      transition: all 0.3s ease;
+    }
+
+    .cta::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--plasma);
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: transform 0.3s ease;
+      z-index: -1;
+    }
+
+    .cta:hover {
+      color: var(--void);
+      box-shadow: 0 0 40px rgba(255, 183, 3, 0.4);
+    }
+
+    .cta:hover::before {
+      transform: scaleX(1);
+    }
+
+    .cta:active {
+      transform: scale(0.98);
+    }
+
+    .links {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 2rem;
+      font-size: 0.75rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      z-index: 10;
+    }
+
+    .links a {
+      color: #52525b;
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    .links a:hover { color: var(--flux); }
+
+    /* Mobile adjustments */
+    @media (max-width: 640px) {
+      .hud { font-size: 8px; }
+      .hud-tl, .hud-tr, .hud-bl, .hud-br {
+        position: fixed;
+      }
+      h1 { letter-spacing: -0.01em; }
+      .tagline { letter-spacing: 0.2em; font-size: 0.75rem; }
+      .cta { padding: 1rem 2rem; font-size: 0.75rem; }
+      .links { gap: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="grid-bg"></div>
+  <div class="scanlines"></div>
+  <div class="vignette"></div>
+
+  <div class="hud hud-tl">
+    <span>SYS::MACOS_11+</span>
+    <span>ARCH::ARM64/x86</span>
+    <span class="highlight">STATUS::READY</span>
+  </div>
+
+  <div class="hud hud-tr">
+    <span>BUILD::2024.12</span>
+    <span>SIZE::~500MB</span>
+  </div>
+
+  <div class="hud hud-bl">
+    <span>RENDER::WASM</span>
+    <span>EXPORT::4K/60</span>
+  </div>
+
+  <div class="hud hud-br">
+    <span>ENGINE::RUST</span>
+    <span class="highlight">FFT::2048</span>
+  </div>
+
+  <main>
+    <h1>Vibe<br>Machine</h1>
+    <p class="tagline">Your music, rendered</p>
+
+    <a class="cta" href="https://github.com/yourusername/vibe-machine/releases/latest/download/vibe-machine.dmg">
+      Download for Mac
+    </a>
+
+  </main>
+
+  <div class="links">
+    <a href="https://mistystep.io" target="_blank" rel="noopener noreferrer">a misty step project</a>
+  </div>
+</body>
+</html>
