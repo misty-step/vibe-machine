@@ -1,25 +1,17 @@
-name: Release
+name: Build Release
 
 on:
-  push:
-    branches: [master]
+  release:
+    types: [published]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: macos-latest
     permissions:
-      contents: write # Required to create releases
-    # Skip release commits to prevent infinite loop
-    if: "!contains(github.event.head_commit.message, '[skip release]')"
+      contents: write
     steps:
       - uses: actions/checkout@v4
-
-      - name: Generate version
-        id: version
-        run: |
-          VERSION="v0.1.0-$(date -u +%Y%m%d.%H%M%S)"
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - uses: pnpm/action-setup@v4
 
@@ -37,13 +29,14 @@ jobs:
       - name: Setup FFmpeg
         run: ./scripts/setup-ffmpeg.sh
 
-      - name: Build and Release
+      - name: Build and Upload
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ steps.version.outputs.version }}
-          releaseName: "Vibe Machine ${{ steps.version.outputs.version }}"
-          releaseBody: "Download the .dmg and drag to Applications."
+          tagName: ${{ github.event.release.tag_name }}
+          releaseName: ${{ github.event.release.name }}
+          releaseBody: ${{ github.event.release.body }}
           releaseDraft: false
+          prerelease: ${{ github.event.release.prerelease }}
           args: --target aarch64-apple-darwin
