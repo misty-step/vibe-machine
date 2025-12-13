@@ -1,7 +1,7 @@
 {
   "name": "vibe-machine",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0-20251212.233642",
   "type": "module",
   "scripts": {
     "dev": "vite",
