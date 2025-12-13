@@ -11,6 +11,7 @@ export default tseslint.config(
       "src/vibe-engine-wasm/**",
       "src-tauri/target/**",
       "crates/**/target/**",
+      "scripts/**",
       "*.cjs",
       "engine/*.test.ts",
       "utils.test.ts",

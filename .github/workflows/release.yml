@@ -40,3 +40,10 @@ jobs:
           releaseDraft: false
           prerelease: ${{ github.event.release.prerelease }}
           args: --target aarch64-apple-darwin
+
+      - name: Upload to Vercel Blob
+        env:
+          BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+        run: |
+          DMG=$(find src-tauri/target -name "*.dmg" | head -1)
+          node scripts/upload-release.mjs "$DMG" "${{ github.event.release.tag_name }}"
