@@ -4,12 +4,18 @@ on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to build (e.g., v1.0.0)"
+        required: true
 
 jobs:
   build:
     runs-on: macos-latest
     permissions:
       contents: write
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
     steps:
       - uses: actions/checkout@v4
 
@@ -34,11 +40,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.event.release.tag_name }}
-          releaseName: ${{ github.event.release.name }}
-          releaseBody: ${{ github.event.release.body }}
+          tagName: ${{ env.RELEASE_TAG }}
+          releaseName: Vibe Machine ${{ env.RELEASE_TAG }}
           releaseDraft: false
-          prerelease: ${{ github.event.release.prerelease }}
+          prerelease: false
           args: --target aarch64-apple-darwin
 
       - name: Upload to Vercel Blob
@@ -46,4 +51,4 @@ jobs:
           BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
         run: |
           DMG=$(find src-tauri/target -name "*.dmg" | head -1)
-          node scripts/upload-release.mjs "$DMG" "${{ github.event.release.tag_name }}"
+          node scripts/upload-release.mjs "$DMG" "${{ env.RELEASE_TAG }}"
