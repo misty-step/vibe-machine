@@ -167,67 +167,80 @@
         margin-bottom: 3rem;
       }
 
-      .cta {
-        display: inline-block;
-        background: transparent;
-        color: var(--plasma);
-        font-family: inherit;
-        font-size: 0.875rem;
-        font-weight: 500;
-        letter-spacing: 0.2em;
-        text-transform: uppercase;
-        text-decoration: none;
-        padding: 1.25rem 3rem;
-        border: 1px solid var(--plasma);
-        position: relative;
-        overflow: hidden;
+      .install {
+        display: flex;
+        align-items: center;
+        gap: 0;
+        background: var(--glass);
+        border: 1px solid rgba(14, 165, 233, 0.2);
+        border-radius: 8px;
+        padding: 0.25rem;
         transition: all 0.3s ease;
       }
 
-      .cta::before {
-        content: "";
-        position: absolute;
-        inset: 0;
-        background: var(--plasma);
-        transform: scaleX(0);
-        transform-origin: left;
-        transition: transform 0.3s ease;
-        z-index: -1;
+      .install:hover {
+        border-color: rgba(14, 165, 233, 0.4);
+        box-shadow: 0 0 30px rgba(14, 165, 233, 0.15);
       }
 
-      .cta:hover {
-        color: var(--void);
-        box-shadow: 0 0 40px rgba(255, 183, 3, 0.4);
-      }
-
-      .cta:hover::before {
-        transform: scaleX(1);
-      }
-
-      .cta:active {
-        transform: scale(0.98);
-      }
-
-      .brew {
-        margin-top: 1.5rem;
-        font-size: 0.75rem;
-        color: #52525b;
-      }
-
-      .brew code {
-        display: inline-block;
-        background: var(--glass);
+      .install code {
         color: var(--flux);
-        padding: 0.5rem 1rem;
-        border-radius: 4px;
+        padding: 0.75rem 1rem;
         font-family: inherit;
-        margin-top: 0.5rem;
-        cursor: pointer;
-        transition: all 0.2s;
+        font-size: 0.875rem;
+        letter-spacing: 0.02em;
       }
 
-      .brew code:hover {
-        background: rgba(14, 165, 233, 0.15);
+      .copy-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        background: rgba(14, 165, 233, 0.1);
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        position: relative;
+        flex-shrink: 0;
+      }
+
+      .copy-btn:hover {
+        background: rgba(14, 165, 233, 0.2);
+      }
+
+      .copy-btn:active {
+        transform: scale(0.95);
+      }
+
+      .copy-btn svg {
+        width: 18px;
+        height: 18px;
+        position: absolute;
+        transition: all 0.2s ease;
+      }
+
+      .copy-btn .icon-copy {
+        color: var(--flux);
+        opacity: 1;
+        transform: scale(1);
+      }
+
+      .copy-btn .icon-check {
+        color: var(--plasma);
+        opacity: 0;
+        transform: scale(0.5);
+      }
+
+      .copy-btn.copied .icon-copy {
+        opacity: 0;
+        transform: scale(0.5);
+      }
+
+      .copy-btn.copied .icon-check {
+        opacity: 1;
+        transform: scale(1);
       }
 
       .links {
@@ -271,9 +284,14 @@
           letter-spacing: 0.2em;
           font-size: 0.75rem;
         }
-        .cta {
-          padding: 1rem 2rem;
-          font-size: 0.75rem;
+        .install {
+          flex-direction: column;
+          gap: 0.5rem;
+          padding: 0.75rem;
+        }
+        .install code {
+          font-size: 0.7rem;
+          padding: 0.5rem;
         }
         .links {
           gap: 1.5rem;
@@ -293,7 +311,7 @@
     </div>
 
     <div class="hud hud-tr">
-      <span>BUILD::2024.12</span>
+      <span>BUILD::2025.12</span>
       <span>SIZE::~500MB</span>
     </div>
 
@@ -311,20 +329,42 @@
       <h1>Vibe<br />Machine</h1>
       <p class="tagline">Your music, rendered</p>
 
-      <a
-        class="cta"
-        href="https://vre6kzshqnquncrg.public.blob.vercel-storage.com/releases/vibe-machine-latest.dmg"
-      >
-        Download for Mac
-      </a>
-
-      <div class="brew">
-        <span>or install via Homebrew</span>
-        <br />
-        <code onclick="navigator.clipboard.writeText('brew install misty-step/tap/vibe-machine')"
-          >brew install misty-step/tap/vibe-machine</code
-        >
+      <div class="install">
+        <code>brew install misty-step/tap/vibe-machine</code>
+        <button class="copy-btn" onclick="copyCommand(this)">
+          <svg
+            class="icon-copy"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+          <svg
+            class="icon-check"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+        </button>
       </div>
+
+      <script>
+        function copyCommand(btn) {
+          navigator.clipboard.writeText("brew install misty-step/tap/vibe-machine");
+          btn.classList.add("copied");
+          setTimeout(() => btn.classList.remove("copied"), 2000);
+        }
+      </script>
     </main>
 
     <div class="links">
