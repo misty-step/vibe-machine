@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.0](https://github.com/misty-step/vibe-machine/compare/v1.0.1...v1.1.0) (2025-12-16)
+
+
+### Features
+
+* **site:** add Homebrew install instructions ([486c6ca](https://github.com/misty-step/vibe-machine/commit/486c6caa9178aa0bcbaa04547442bd8ce8351dee))
+* **site:** Homebrew-only install with copy button ([18244ba](https://github.com/misty-step/vibe-machine/commit/18244ba5acd18db1d6380cf6b89db36bd68aed82))
+
 ## [1.0.1](https://github.com/misty-step/vibe-machine/compare/v1.0.0...v1.0.1) (2025-12-15)
 
 ### Bug Fixes
