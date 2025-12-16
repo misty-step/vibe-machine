@@ -2,10 +2,9 @@
 
 ## [1.0.1](https://github.com/misty-step/vibe-machine/compare/v1.0.0...v1.0.1) (2025-12-15)
 
-
 ### Bug Fixes
 
-* **ci:** support manual workflow dispatch with tag input ([f738d30](https://github.com/misty-step/vibe-machine/commit/f738d30425be8918b0990d58a4dcebe9024feb3c))
+- **ci:** support manual workflow dispatch with tag input ([f738d30](https://github.com/misty-step/vibe-machine/commit/f738d30425be8918b0990d58a4dcebe9024feb3c))
 
 ## 1.0.0 (2025-12-15)
 

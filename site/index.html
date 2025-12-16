@@ -208,6 +208,28 @@
         transform: scale(0.98);
       }
 
+      .brew {
+        margin-top: 1.5rem;
+        font-size: 0.75rem;
+        color: #52525b;
+      }
+
+      .brew code {
+        display: inline-block;
+        background: var(--glass);
+        color: var(--flux);
+        padding: 0.5rem 1rem;
+        border-radius: 4px;
+        font-family: inherit;
+        margin-top: 0.5rem;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .brew code:hover {
+        background: rgba(14, 165, 233, 0.15);
+      }
+
       .links {
         position: fixed;
         bottom: 20px;
@@ -295,6 +317,14 @@
       >
         Download for Mac
       </a>
+
+      <div class="brew">
+        <span>or install via Homebrew</span>
+        <br />
+        <code onclick="navigator.clipboard.writeText('brew install misty-step/tap/vibe-machine')"
+          >brew install misty-step/tap/vibe-machine</code
+        >
+      </div>
     </main>
 
     <div class="links">
