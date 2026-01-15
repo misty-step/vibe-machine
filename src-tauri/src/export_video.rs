@@ -1,5 +1,6 @@
 //! Video export pipeline - decode audio, render frames, pipe to FFmpeg.
 
+use crate::export_frame::{FrameComposer, OverlayConfig};
 use crate::path_guard::guard_export_paths;
 use spectrum_analyzer::windows::hann_window;
 use spectrum_analyzer::{samples_fft_to_spectrum, scaling::divide_by_N_sqrt, FrequencyLimit};
@@ -31,6 +32,10 @@ pub struct ExportParams {
     pub fps: u32,
     pub width: i32,
     pub height: i32,
+    #[serde(default)]
+    pub show_progress: bool,
+    #[serde(default)]
+    pub text_overlay_png_base64: String,
 }
 
 #[tauri::command]
@@ -42,6 +47,9 @@ pub async fn export_video(app: tauri::AppHandle, params: ExportParams) -> Result
         fps,
         width,
         height,
+        image_path,
+        show_progress,
+        text_overlay_png_base64,
         ..
     } = params;
 
@@ -90,7 +98,7 @@ pub async fn export_video(app: tauri::AppHandle, params: ExportParams) -> Result
             "-f",
             "rawvideo",
             "-pixel_format",
-            "bgra",
+            "rgba",
             "-video_size",
             &format!("{}x{}", width, height),
             "-framerate",
@@ -120,6 +128,20 @@ pub async fn export_video(app: tauri::AppHandle, params: ExportParams) -> Result
 
     // 3. Rendering Loop
     let mut engine = VibeEngine::new(width, height);
+
+    let accent_rgb = hex_to_rgb(&settings.visualizer_color);
+    let overlay = OverlayConfig {
+        show_progress,
+        accent_rgb,
+    };
+    let composer = FrameComposer::new(
+        width,
+        height,
+        &image_path,
+        overlay,
+        &text_overlay_png_base64,
+    )?;
+    let mut frame = vec![0u8; (width.max(1) * height.max(1)) as usize * 4];
 
     let _ = app.emit(
         "export-progress",
@@ -177,9 +199,10 @@ pub async fn export_video(app: tauri::AppHandle, params: ExportParams) -> Result
         // Engine Render
         engine.render_native(&settings, &freq_data_u8);
 
-        // Write
+        // Compose frame (background + viz + overlays) then write
         let pixels = engine.get_pixel_slice();
-        child.write(pixels).map_err(|e| e.to_string())?;
+        composer.compose_into(pixels, i, total_frames, &mut frame);
+        child.write(&frame).map_err(|e| e.to_string())?;
 
         if i % 30 == 0 {
             let _ = app.emit(
@@ -217,6 +240,17 @@ pub async fn export_video(app: tauri::AppHandle, params: ExportParams) -> Result
     );
 
     Ok(())
+}
+
+fn hex_to_rgb(hex: &str) -> (u8, u8, u8) {
+    let h = hex.trim_start_matches('#');
+    if h.len() == 6 {
+        let r = u8::from_str_radix(&h[0..2], 16).unwrap_or(255);
+        let g = u8::from_str_radix(&h[2..4], 16).unwrap_or(255);
+        let b = u8::from_str_radix(&h[4..6], 16).unwrap_or(255);
+        return (r, g, b);
+    }
+    (255, 183, 3) // Plasma fallback
 }
 
 fn build_fft_bins(window: &[f32], sample_rate: u32) -> Vec<u8> {

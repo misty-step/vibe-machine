@@ -23,7 +23,20 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": [
+          "$HOME/**",
+          "$DESKTOP/**",
+          "$DOCUMENT/**",
+          "$DOWNLOAD/**",
+          "$MUSIC/**",
+          "$PICTURE/**",
+          "$VIDEO/**",
+          "$TEMP/**"
+        ]
+      }
     },
     "macOSPrivateApi": true
   },

@@ -33,7 +33,9 @@ interface VibeState {
 
   // Visual Assets
   backgroundImage: string | null; // Object URL
+  backgroundImagePath: string | null; // Absolute path (desktop only)
   setBackgroundImage: (url: string | null) => void;
+  setBackgroundImagePath: (path: string | null) => void;
 
   // Export State
   isExporting: boolean;
@@ -126,7 +128,9 @@ export const useVibeStore = create<VibeState>()(
 
     // Assets
     backgroundImage: null,
+    backgroundImagePath: null,
     setBackgroundImage: (url) => set({ backgroundImage: url }),
+    setBackgroundImagePath: (path) => set({ backgroundImagePath: path }),
 
     // Export
     isExporting: false,

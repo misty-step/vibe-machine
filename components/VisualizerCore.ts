@@ -1,5 +1,6 @@
-import { VibeSettings, Track, FontFamily, FontSize } from "../types";
+import { VibeSettings, Track } from "../types";
 import init, { VibeEngine } from "../src/vibe-engine-wasm";
+import { drawTitleArtist } from "../utils/overlayText";
 
 // Initialize WASM once; capture exports for memory access.
 const wasmExports = await init();
@@ -140,33 +141,8 @@ export class VisualizerCore {
   ) {
     const padding = 32;
     const barHeight = 8;
-    const titleFontSize = this.mapFontSize(settings.fontSize);
     ctx.save();
-    ctx.textBaseline = "top";
-    const title = currentTrack?.name || "Untitled";
-    const artist = currentTrack?.artist || "";
-
-    // Title + Artist positioning (aligned with visualizer bars baseline)
-    if (settings.showTitle) {
-      const barsBaseline = this.height - 80; // matches Rust engine origin_y
-      const titleArtistGap = 12;
-      const artistFontSize = Math.floor(titleFontSize * 0.55);
-
-      // Artist bottom aligns with bars baseline
-      const artistY = barsBaseline - artistFontSize;
-      // Title sits above artist
-      const titleY = artistY - titleArtistGap - titleFontSize;
-
-      ctx.font = `600 ${titleFontSize}px ${this.mapFontFamily(settings.fontFamily)}`;
-      ctx.fillStyle = "#f8fafc";
-      ctx.fillText(title, padding, titleY);
-
-      if (artist) {
-        ctx.font = `500 ${artistFontSize}px ${this.mapFontFamily(settings.fontFamily)}`;
-        ctx.fillStyle = "rgba(248,250,252,0.65)";
-        ctx.fillText(artist, padding, artistY);
-      }
-    }
+    drawTitleArtist(ctx, settings, currentTrack, this.width, this.height);
 
     // Progress bar
     if (settings.showProgress && duration > 0) {
@@ -180,41 +156,5 @@ export class VisualizerCore {
     }
 
     ctx.restore();
-  }
-
-  private mapFontSize(size: FontSize) {
-    switch (size) {
-      case FontSize.Small:
-        return 36;
-      case FontSize.Medium:
-        return 48;
-      case FontSize.Large:
-        return 60;
-      case FontSize.ExtraLarge:
-        return 72;
-      default:
-        return 48;
-    }
-  }
-
-  private mapFontFamily(family: FontFamily) {
-    // Match loaded fonts; fall back to sans
-    switch (family) {
-      case FontFamily.Playfair:
-        return "Playfair Display";
-      case FontFamily.Mono:
-        return "JetBrains Mono";
-      case FontFamily.Inter:
-        return "Inter";
-      case FontFamily.RobotoSlab:
-        return "Roboto Slab";
-      case FontFamily.Cinzel:
-        return "Cinzel";
-      case FontFamily.Montserrat:
-        return "Montserrat";
-      case FontFamily.Geist:
-      default:
-        return "Geist Sans, sans-serif";
-    }
   }
 }

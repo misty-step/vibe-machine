@@ -5,9 +5,16 @@
  * Exposes: isSupported(), attachProgressListener(), startExport()
  */
 
-import { isTauri, tauriDialogs, tauriInvoke, tauriListen } from "../platform/tauriEnv";
+import {
+  isTauri,
+  normalizeFilePath,
+  tauriDialogs,
+  tauriInvoke,
+  tauriListen,
+} from "../platform/tauriEnv";
 import { useVibeStore } from "../store/vibeStore";
 import { AspectRatio, VibeSettings } from "../types";
+import { renderTextOverlay } from "./renderTextOverlay";
 
 export interface ExportController {
   isSupported(): boolean;
@@ -79,7 +86,15 @@ export function createExportController(): ExportController {
     },
 
     async startExport(): Promise<void> {
-      const { setExportState, isExporting, settings, playlist } = useVibeStore.getState();
+      const {
+        setExportState,
+        isExporting,
+        settings,
+        playlist,
+        currentTrackId,
+        updateTrackInfo,
+        backgroundImagePath,
+      } = useVibeStore.getState();
 
       // Platform guard
       if (!isTauri()) {
@@ -92,54 +107,72 @@ export function createExportController(): ExportController {
         return;
       }
 
-      // Playlist guard
+      // Track guard
       if (playlist.length === 0) {
-        setExportState(false, 0, "Add audio tracks first");
+        setExportState(false, 0, "Add audio to enable export");
         return;
       }
+
+      const currentTrack = playlist.find((t) => t.id === currentTrackId) ?? playlist[0] ?? null;
 
       try {
         const dialogs = await tauriDialogs();
 
-        // 1. Pick audio source file
-        const audioPath = await dialogs.open({
-          filters: [
-            {
-              name: "Audio",
-              extensions: ["mp3", "wav", "flac", "m4a", "aac", "ogg"],
-            },
-          ],
-          multiple: false,
+        // 1. Pick output path (primary intent)
+        const outputPathRaw = await dialogs.save({
+          filters: [{ name: "Video", extensions: ["mp4"] }],
+          defaultPath: currentTrack?.name ? `${currentTrack.name}.mp4` : undefined,
         });
 
-        if (!audioPath || Array.isArray(audioPath)) {
+        if (!outputPathRaw) {
           return; // Cancelled - no state change
         }
 
-        // 2. Pick output path
-        const outputPath = await dialogs.save({
-          filters: [{ name: "Video", extensions: ["mp4"] }],
-        });
+        const outputPath = /\.mp4$/i.test(outputPathRaw) ? outputPathRaw : `${outputPathRaw}.mp4`;
 
-        if (!outputPath) {
-          return; // Cancelled - no state change
+        // 2. Resolve audio source path
+        let audioPath = currentTrack?.sourcePath;
+
+        if (!audioPath) {
+          setExportState(false, 0, "Select source audio for export");
+          const pickedRaw = await dialogs.open({
+            filters: [
+              {
+                name: "Audio",
+                extensions: ["mp3", "wav", "flac", "m4a", "aac", "ogg"],
+              },
+            ],
+            multiple: false,
+          });
+
+          if (!pickedRaw || Array.isArray(pickedRaw)) {
+            return; // Cancelled - no state change
+          }
+
+          audioPath = normalizeFilePath(pickedRaw);
+          if (currentTrack?.id) {
+            updateTrackInfo(currentTrack.id, "sourcePath", audioPath);
+          }
         }
 
         // 3. Start export
         setExportState(true, 0, "Initializing Native Forge...");
 
         const { width, height } = getResolution(settings.aspectRatio);
+        const textOverlay = await renderTextOverlay(settings, currentTrack, width, height);
         const invoke = await tauriInvoke();
 
         await invoke("export_video", {
           params: {
             audio_path: audioPath,
-            image_path: "", // MVP: no background image export yet
+            image_path: backgroundImagePath ?? "",
             output_path: outputPath,
             settings: mapSettingsToRust(settings),
             fps: 30,
             width,
             height,
+            show_progress: settings.showProgress,
+            text_overlay_png_base64: textOverlay,
           },
         });
 

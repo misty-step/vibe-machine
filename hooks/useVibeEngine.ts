@@ -38,10 +38,40 @@ export const useVibeEngine = () => {
       const tracks = [];
       for (const file of files) {
         const duration = await getAudioDuration(file);
+        const sourcePath =
+          typeof (file as { path?: unknown }).path === "string"
+            ? String((file as { path?: string }).path)
+            : undefined;
         tracks.push({
           id: generateId(),
           file,
+          sourcePath,
           name: file.name.replace(/\.[^/.]+$/, ""),
+          artist: "",
+          duration,
+        });
+      }
+
+      const wasEmpty = useVibeStore.getState().playlist.length === 0;
+      addTracks(tracks);
+
+      if (wasEmpty && tracks.length > 0) {
+        selectTrack(tracks[0].id);
+      }
+    },
+    addTracksFromPaths: async (paths: string[]) => {
+      const { generateId, getAudioDurationFromUrl } = await import("../utils");
+      const { tauriConvertFileSrc } = await import("../platform/tauriEnv");
+      const convertFileSrc = await tauriConvertFileSrc();
+      const tracks = [];
+      for (const path of paths) {
+        const url = convertFileSrc(path);
+        const duration = await getAudioDurationFromUrl(url);
+        const name = path.split(/[\\/]/).pop() ?? "Untitled";
+        tracks.push({
+          id: generateId(),
+          sourcePath: path,
+          name: name.replace(/\.[^/.]+$/, ""),
           artist: "",
           duration,
         });

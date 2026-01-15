@@ -7,6 +7,7 @@ import { Sidebar } from "./components/Sidebar";
 import { PlayerControls } from "./components/PlayerControls";
 import { useVibeStore } from "./store/vibeStore";
 import { exportController } from "./export/ExportController";
+import { isTauri, normalizeFilePath, tauriConvertFileSrc, tauriDialogs } from "./platform/tauriEnv";
 
 // --- Subcomponents ---
 
@@ -35,12 +36,14 @@ const App: React.FC = () => {
   const updateSettings = useVibeStore((s) => s.updateSettings);
   const backgroundImage = useVibeStore((s) => s.backgroundImage);
   const setBackgroundImage = useVibeStore((s) => s.setBackgroundImage);
+  const setBackgroundImagePath = useVibeStore((s) => s.setBackgroundImagePath);
   const initializeStore = useVibeStore((s) => s.initialize);
 
   // Export state from store (single source of truth)
   const isExporting = useVibeStore((s) => s.isExporting);
   const exportProgress = useVibeStore((s) => s.exportProgress);
   const exportStatus = useVibeStore((s) => s.exportStatus);
+  const isExportSupported = exportController.isSupported();
 
   const [isCinemaMode, setIsCinemaMode] = React.useState<boolean>(false);
 
@@ -71,12 +74,46 @@ const App: React.FC = () => {
         // Revoke old if exists (handled by store logic ideally, but manual here for now)
         if (backgroundImage) URL.revokeObjectURL(backgroundImage);
         setBackgroundImage(url);
+        const sourcePath =
+          typeof (file as { path?: unknown }).path === "string"
+            ? String((file as { path?: string }).path)
+            : null;
+        if (sourcePath) setBackgroundImagePath(sourcePath);
       } else {
         const files = Array.from(e.target.files) as File[];
         await engine.addTracks(files);
       }
     }
     e.target.value = "";
+  };
+
+  const handleNativePick = async (type: "audio" | "image") => {
+    if (!isTauri()) return;
+    const dialogs = await tauriDialogs();
+    const convertFileSrc = await tauriConvertFileSrc();
+
+    if (type === "image") {
+      const imagePathRaw = await dialogs.open({
+        filters: [{ name: "Image", extensions: ["png", "jpg", "jpeg", "webp"] }],
+        multiple: false,
+      });
+      if (!imagePathRaw || Array.isArray(imagePathRaw)) return;
+      const imagePath = normalizeFilePath(imagePathRaw);
+      setBackgroundImage(convertFileSrc(imagePath));
+      setBackgroundImagePath(imagePath);
+      return;
+    }
+
+    const audioPathsRaw = await dialogs.open({
+      filters: [{ name: "Audio", extensions: ["mp3", "wav", "flac", "m4a", "aac", "ogg"] }],
+      multiple: true,
+    });
+
+    if (!audioPathsRaw) return;
+    const paths = (Array.isArray(audioPathsRaw) ? audioPathsRaw : [audioPathsRaw]).map(
+      normalizeFilePath
+    );
+    await engine.addTracksFromPaths(paths);
   };
 
   // Keyboard Shortcuts
@@ -138,6 +175,8 @@ const App: React.FC = () => {
           playlist={engine.playlist}
           currentTrackIndex={engine.currentTrackIndex}
           isPlaying={engine.isPlaying}
+          isExportSupported={isExportSupported}
+          isDesktopApp={isExportSupported}
           settings={settings}
           setSettings={(val) => {
             if (typeof val === "function") {
@@ -151,6 +190,8 @@ const App: React.FC = () => {
           exportProgress={exportProgress}
           exportStatus={exportStatus}
           onFileUpload={handleFileUpload}
+          onPickAudio={() => handleNativePick("audio")}
+          onPickImage={() => handleNativePick("image")}
           onRemoveTrack={engine.removeTrack}
           onUpdateTrackInfo={engine.updateTrackInfo}
           onSelectTrack={engine.selectTrack}

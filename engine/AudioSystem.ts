@@ -1,4 +1,5 @@
 import { useVibeStore } from "../store/vibeStore";
+import { isTauri, tauriConvertFileSrc } from "../platform/tauriEnv";
 
 export class AudioSystem {
   private context: AudioContext | null = null;
@@ -27,7 +28,7 @@ export class AudioSystem {
     useVibeStore.subscribe(
       (state) => state.currentTrackId,
       (newId, oldId) => {
-        if (newId !== oldId) this.loadTrack(newId);
+        if (newId !== oldId) void this.loadTrack(newId);
       }
     );
 
@@ -83,7 +84,7 @@ export class AudioSystem {
     }
   }
 
-  private loadTrack(trackId: string | null) {
+  private async loadTrack(trackId: string | null) {
     if (!trackId) {
       this.audioEl.src = "";
       return;
@@ -94,8 +95,16 @@ export class AudioSystem {
 
     if (track) {
       console.log(`[AudioSystem] Loading track: ${track.name}`);
-      const url = URL.createObjectURL(track.file);
-      this.audioEl.src = url;
+      if (track.sourcePath && isTauri()) {
+        const convertFileSrc = await tauriConvertFileSrc();
+        this.audioEl.src = convertFileSrc(track.sourcePath);
+      } else if (track.file) {
+        const url = URL.createObjectURL(track.file);
+        this.audioEl.src = url;
+      } else {
+        console.warn("[AudioSystem] Track missing source data.");
+        this.audioEl.src = "";
+      }
       this.audioEl.load(); // Explicit load
 
       if (useVibeStore.getState().isPlaying) {
