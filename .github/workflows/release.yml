@@ -1,23 +1,41 @@
-name: Build Release
+name: Release
 
 on:
-  release:
-    types: [published]
+  push:
+    branches: [master]
   workflow_dispatch:
-    inputs:
-      tag:
-        description: "Release tag to build (e.g., v1.0.0)"
-        required: true
+
+permissions:
+  contents: write
+  pull-requests: write
 
 jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          release-type: node
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
   build:
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
     runs-on: macos-latest
     permissions:
       contents: write
     env:
-      RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      RELEASE_TAG: ${{ needs.release-please.outputs.tag_name }}
     steps:
+      # Checkout the specific tag to avoid race with new commits
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
 
       - uses: pnpm/action-setup@v4
 
@@ -25,6 +43,11 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+
+      # Cache Rust builds for faster CI
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -35,13 +58,20 @@ jobs:
       - name: Setup FFmpeg
         run: ./scripts/setup-ffmpeg.sh
 
-      - name: Build and Upload
+      - name: Build Tauri App
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Optional: Add these secrets for proper code signing
+          # APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          # APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          # APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          # APPLE_ID: ${{ secrets.APPLE_ID }}
+          # APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           tagName: ${{ env.RELEASE_TAG }}
-          releaseName: Vibe Machine ${{ env.RELEASE_TAG }}
+          # Don't set releaseName - preserves release-please changelog
           releaseDraft: false
           prerelease: false
           args: --target aarch64-apple-darwin
@@ -50,7 +80,18 @@ jobs:
         env:
           BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
         run: |
-          DMG=$(find src-tauri/target -name "*.dmg" | head -1)
+          if [ -z "$BLOB_READ_WRITE_TOKEN" ]; then
+            echo "::warning::BLOB_READ_WRITE_TOKEN not set, skipping upload"
+            exit 0
+          fi
+
+          DMG=$(find src-tauri/target -path "*/bundle/dmg/*.dmg" | head -1)
+          if [ -z "$DMG" ]; then
+            echo "::error::No DMG found in bundle path"
+            exit 1
+          fi
+
+          echo "Uploading $DMG..."
           node scripts/upload-release.mjs "$DMG" "${{ env.RELEASE_TAG }}"
 
       - name: Update Homebrew Tap
@@ -61,7 +102,23 @@ jobs:
             echo "::warning::HOMEBREW_TAP_TOKEN not set, skipping Homebrew update"
             exit 0
           fi
-          DMG=$(find src-tauri/target -name "*.dmg" | head -1)
+
+          DMG=$(find src-tauri/target -path "*/bundle/dmg/*.dmg" | head -1)
           SHA256=$(shasum -a 256 "$DMG" | awk '{print $1}')
           VERSION="${RELEASE_TAG#v}"
+
+          echo "Updating Homebrew cask to $VERSION with SHA256 $SHA256"
           ./scripts/update-homebrew-cask.sh "$VERSION" "$SHA256" "$HOMEBREW_TAP_TOKEN"
+
+      - name: Summary
+        run: |
+          echo "## Release ${{ env.RELEASE_TAG }} Published! 🎉" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ DMG built and attached to GitHub release" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Uploaded to Vercel Blob for Homebrew" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Homebrew cask updated" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Users can update via:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "brew upgrade --cask vibe-machine" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
