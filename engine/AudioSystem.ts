@@ -1,6 +1,26 @@
 import { useVibeStore } from "../store/vibeStore";
 import { isTauri, tauriConvertFileSrc } from "../platform/tauriEnv";
 
+/**
+ * AudioSystem - Singleton managing Web Audio API and HTML5 Audio playback.
+ *
+ * ## State Machine (see docs/STATE_FLOWS.md for Mermaid diagram)
+ *
+ * Initialization states:
+ * - Uninitialized -> ContextCreated -> GraphConnected
+ *
+ * Playback states:
+ * - NoTrack -> Loading -> Ready -> Playing <-> Paused -> Ended -> Loading...
+ *
+ * ## Store Subscriptions
+ * - `currentTrackId` changes trigger `loadTrack()`
+ * - `isPlaying` changes trigger `play()` or `pause()`
+ *
+ * ## Context Lifecycle
+ * AudioContext starts suspended per browser policy. First user gesture
+ * (via `unlock()` or play action) resumes it. Browser may re-suspend on
+ * tab hide; we re-resume on next play.
+ */
 export class AudioSystem {
   private context: AudioContext | null = null;
   private analyser: AnalyserNode | null = null;

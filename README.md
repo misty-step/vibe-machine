@@ -1,70 +1,51 @@
 # Vibe Machine
 
-> **A cinematic audio visualizer forge.**
-> Lo-fi aesthetics. Hi-fi physics. Pure atmosphere.
+Tauri desktop app for creating cinematic audio visualizations with 4K/60fps video export.
 
-![Vibe Machine Screenshot](https://via.placeholder.com/1200x600/050505/f59e0b?text=VIBE+MACHINE)
+## Quick Start
 
-**Vibe Machine** is a browser-based instrument for creating deep, immersive audio visualizations. It combines high-performance Web Audio API physics with a "Cinematic Ether" aesthetic designed to turn your music library into a visual experience.
+```bash
+# Install (macOS)
+brew install misty-step/tap/vibe-machine
 
-## ✨ Key Features
+# Or build from source
+pnpm install
+pnpm tauri dev          # Full desktop app with hot reload
+```
 
-- **High-Energy Physics**: Custom-tuned `Attack/Decay` envelopes for visuals that snap to the beat and breathe with the bass.
-- **Cinematic Ether Design**: A "Dark Mode First" UI built on glassmorphism, deep obsidian backgrounds, and electric amber accents.
-- **Immersion Mode**: One-click "Cinema Mode" dissolves the UI entirely, leaving only the music and the art.
-- **Smart Typography**: Dynamic font rendering on the HTML5 Canvas, supporting modern, elegant, and technical typefaces.
-- **Analog Texture**: Subtle film grain and noise overlays for a tactile, non-digital feel.
+Drop an audio file, drop a background image, hit play. Export to MP4 when ready.
 
-## 🛠️ Tech Stack
+## Why
 
-- **Core**: React 19 + Vite + TypeScript
-- **Styling**: Tailwind CSS (Custom "Cinema Scope" configuration)
-- **Audio**: Native Web Audio API (`AnalyserNode`, `GainNode`)
-- **Visuals**: HTML5 Canvas 2D Context (Procedural animation)
-- **Icons**: Lucide React
+Turn music into shareable video. Real-time preview at 60fps, then export frame-perfect 4K video with the same Rust renderer. No quality gap between preview and final output.
 
-## 🚀 Getting Started
+## Architecture
 
-1.  **Clone the repository**
+Same Rust code powers both preview and export:
 
-    ```bash
-    git clone https://github.com/misty-step/vibe-machine.git
-    cd vibe-machine
-    ```
+```
+vibe-engine (Rust crate)
+├── WASM target → React canvas preview (60fps)
+└── Native target → FFmpeg pipe (4K/60fps export)
+```
 
-2.  **Install dependencies**
+Key modules:
 
-    ```bash
-    npm install
-    # or
-    pnpm install
-    ```
+- `crates/vibe-engine/` - Pure Rust visualizer: `f(state, freq_data) → pixels`
+- `src-tauri/` - Desktop shell, FFmpeg piping, audio decode
+- `App.tsx` - React orchestrator: Web Audio, file handling, UI
 
-3.  **Run the forge**
+See `CLAUDE.md` for full architecture details.
 
-    ```bash
-    npm run dev
-    ```
+## Development
 
-4.  **Vibe**
-    Open `http://localhost:5173`, drop an image, drop a track, and hit play.
+```bash
+pnpm dev                # Vite only (web preview, no export)
+pnpm tauri dev          # Full desktop app
+pnpm build:wasm         # Rebuild WASM after Rust changes
+pnpm tauri build        # Package .app/.exe
+```
 
-## 🎨 Aesthetic Philosophy
+## License
 
-**"Emptiness is not nothing—it is potential."** — Kenya Hara
-
-Vibe Machine rejects the "dashboard" template. It is designed as a HUD (Heads-Up Display) that floats over your content.
-
-- **Dissolve the Container**: No opaque backgrounds. Everything is glass.
-- **Electric Amber**: A single, confident accent color (`#f59e0b`) replaces generic blue/indigo.
-- **Deep Obsidian**: Backgrounds are `#050505`, not gray.
-
-## ⌨️ Controls
-
-- **Space**: Play / Pause
-- **CMD+K**: Toggle Command Center (Future) / Quick Actions
-- **ESC**: Exit Cinema Mode
-
----
-
-© 2025 Misty Step. Built for the night shift.
+MIT
