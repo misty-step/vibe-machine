@@ -10,13 +10,18 @@ use std::path::PathBuf;
 pub struct GuardedExportPaths {
     pub audio: PathBuf,
     pub output: PathBuf,
+    pub image: Option<PathBuf>,
 }
 
 /// Validate and canonicalize export paths.
 ///
 /// # Errors
 /// Returns human-readable error string on validation failure.
-pub fn guard_export_paths(audio_path: &str, output_path: &str) -> Result<GuardedExportPaths, String> {
+pub fn guard_export_paths(
+    audio_path: &str,
+    output_path: &str,
+    image_path: &str,
+) -> Result<GuardedExportPaths, String> {
     // Parse paths
     let audio = PathBuf::from(audio_path);
     let output = PathBuf::from(output_path);
@@ -69,7 +74,24 @@ pub fn guard_export_paths(audio_path: &str, output_path: &str) -> Result<Guarded
         return Err("output parent is not a directory".into());
     }
 
-    Ok(GuardedExportPaths { audio, output })
+    // Image path validation (optional)
+    let image = if image_path.is_empty() {
+        None
+    } else {
+        let img = PathBuf::from(image_path);
+        if !img.is_absolute() {
+            return Err("image_path must be absolute".into());
+        }
+        let img = img
+            .canonicalize()
+            .map_err(|e| format!("image_path canonicalize failed: {}", e))?;
+        if !img.is_file() {
+            return Err("image_path must be a file".into());
+        }
+        Some(img)
+    };
+
+    Ok(GuardedExportPaths { audio, output, image })
 }
 
 #[cfg(test)]
@@ -95,6 +117,7 @@ mod tests {
         let result = guard_export_paths(
             audio.to_str().unwrap(),
             output.to_str().unwrap(),
+            "",
         );
 
         assert!(result.is_ok());
@@ -108,7 +131,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let output = dir.path().join("output.mp4");
 
-        let result = guard_export_paths("relative/path.mp3", output.to_str().unwrap());
+        let result = guard_export_paths("relative/path.mp3", output.to_str().unwrap(), "");
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("audio_path must be absolute"));
     }
@@ -122,6 +145,7 @@ mod tests {
         let result = guard_export_paths(
             audio.to_str().unwrap(),
             output.to_str().unwrap(),
+            "",
         );
 
         assert!(result.is_err());
@@ -138,6 +162,7 @@ mod tests {
         let result = guard_export_paths(
             subdir.to_str().unwrap(),
             output.to_str().unwrap(),
+            "",
         );
 
         assert!(result.is_err());
@@ -149,7 +174,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let audio = create_test_audio(dir.path());
 
-        let result = guard_export_paths(audio.to_str().unwrap(), "output.mp4");
+        let result = guard_export_paths(audio.to_str().unwrap(), "output.mp4", "");
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("output_path must be absolute"));
     }
@@ -163,6 +188,7 @@ mod tests {
         let result = guard_export_paths(
             audio.to_str().unwrap(),
             output.to_str().unwrap(),
+            "",
         );
 
         assert!(result.is_err());
@@ -178,6 +204,7 @@ mod tests {
         let result = guard_export_paths(
             audio.to_str().unwrap(),
             output.to_str().unwrap(),
+            "",
         );
 
         assert!(result.is_ok());
@@ -192,6 +219,7 @@ mod tests {
         let result = guard_export_paths(
             audio.to_str().unwrap(),
             output.to_str().unwrap(),
+            "",
         );
 
         assert!(result.is_err());
@@ -207,9 +235,85 @@ mod tests {
         let result = guard_export_paths(
             audio.to_str().unwrap(),
             output.to_str().unwrap(),
+            "",
         );
 
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("directory does not exist"));
+    }
+
+    fn create_test_image(dir: &std::path::Path) -> PathBuf {
+        let path = dir.join("test.png");
+        let mut f = File::create(&path).unwrap();
+        f.write_all(b"fake png data").unwrap();
+        path
+    }
+
+    #[test]
+    fn accepts_valid_image_path() {
+        let dir = tempdir().unwrap();
+        let audio = create_test_audio(dir.path());
+        let output = dir.path().join("output.mp4");
+        let image = create_test_image(dir.path());
+
+        let result = guard_export_paths(
+            audio.to_str().unwrap(),
+            output.to_str().unwrap(),
+            image.to_str().unwrap(),
+        );
+
+        assert!(result.is_ok());
+        let guarded = result.unwrap();
+        assert!(guarded.image.is_some());
+        assert!(guarded.image.unwrap().is_absolute());
+    }
+
+    #[test]
+    fn accepts_empty_image_path() {
+        let dir = tempdir().unwrap();
+        let audio = create_test_audio(dir.path());
+        let output = dir.path().join("output.mp4");
+
+        let result = guard_export_paths(
+            audio.to_str().unwrap(),
+            output.to_str().unwrap(),
+            "",
+        );
+
+        assert!(result.is_ok());
+        assert!(result.unwrap().image.is_none());
+    }
+
+    #[test]
+    fn rejects_relative_image_path() {
+        let dir = tempdir().unwrap();
+        let audio = create_test_audio(dir.path());
+        let output = dir.path().join("output.mp4");
+
+        let result = guard_export_paths(
+            audio.to_str().unwrap(),
+            output.to_str().unwrap(),
+            "relative/image.png",
+        );
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("image_path must be absolute"));
+    }
+
+    #[test]
+    fn rejects_nonexistent_image() {
+        let dir = tempdir().unwrap();
+        let audio = create_test_audio(dir.path());
+        let output = dir.path().join("output.mp4");
+        let image = dir.path().join("nonexistent.png");
+
+        let result = guard_export_paths(
+            audio.to_str().unwrap(),
+            output.to_str().unwrap(),
+            image.to_str().unwrap(),
+        );
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("image_path canonicalize failed"));
     }
 }

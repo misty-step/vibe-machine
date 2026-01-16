@@ -1,5 +1,26 @@
 import { useVibeStore } from "../store/vibeStore";
+import { isTauri, tauriConvertFileSrc } from "../platform/tauriEnv";
 
+/**
+ * AudioSystem - Singleton managing Web Audio API and HTML5 Audio playback.
+ *
+ * ## State Machine (see docs/STATE_FLOWS.md for Mermaid diagram)
+ *
+ * Initialization states:
+ * - Uninitialized -> ContextCreated -> GraphConnected
+ *
+ * Playback states:
+ * - NoTrack -> Loading -> Ready -> Playing <-> Paused -> Ended -> Loading...
+ *
+ * ## Store Subscriptions
+ * - `currentTrackId` changes trigger `loadTrack()`
+ * - `isPlaying` changes trigger `play()` or `pause()`
+ *
+ * ## Context Lifecycle
+ * AudioContext starts suspended per browser policy. First user gesture
+ * (via `unlock()` or play action) resumes it. Browser may re-suspend on
+ * tab hide; we re-resume on next play.
+ */
 export class AudioSystem {
   private context: AudioContext | null = null;
   private analyser: AnalyserNode | null = null;
@@ -27,7 +48,7 @@ export class AudioSystem {
     useVibeStore.subscribe(
       (state) => state.currentTrackId,
       (newId, oldId) => {
-        if (newId !== oldId) this.loadTrack(newId);
+        if (newId !== oldId) void this.loadTrack(newId);
       }
     );
 
@@ -83,7 +104,7 @@ export class AudioSystem {
     }
   }
 
-  private loadTrack(trackId: string | null) {
+  private async loadTrack(trackId: string | null) {
     if (!trackId) {
       this.audioEl.src = "";
       return;
@@ -94,8 +115,16 @@ export class AudioSystem {
 
     if (track) {
       console.log(`[AudioSystem] Loading track: ${track.name}`);
-      const url = URL.createObjectURL(track.file);
-      this.audioEl.src = url;
+      if (track.sourcePath && isTauri()) {
+        const convertFileSrc = await tauriConvertFileSrc();
+        this.audioEl.src = convertFileSrc(track.sourcePath);
+      } else if (track.file) {
+        const url = URL.createObjectURL(track.file);
+        this.audioEl.src = url;
+      } else {
+        console.warn("[AudioSystem] Track missing source data.");
+        this.audioEl.src = "";
+      }
       this.audioEl.load(); // Explicit load
 
       if (useVibeStore.getState().isPlaying) {

@@ -18,6 +18,8 @@ interface SidebarProps {
   playlist: Track[];
   currentTrackIndex: number;
   isPlaying: boolean;
+  isExportSupported: boolean;
+  isDesktopApp: boolean;
   // Settings State
   settings: VibeSettings;
   setSettings: React.Dispatch<React.SetStateAction<VibeSettings>>;
@@ -27,6 +29,8 @@ interface SidebarProps {
   exportStatus: string;
   // Handlers
   onFileUpload: (e: React.ChangeEvent<HTMLInputElement>, type: "audio" | "image") => void;
+  onPickAudio: () => void;
+  onPickImage: () => void;
   onRemoveTrack: (id: string) => void;
   onUpdateTrackInfo: (id: string, field: keyof Track, value: string) => void;
   onSelectTrack: (index: number) => void;
@@ -39,18 +43,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
   playlist,
   currentTrackIndex,
   isPlaying,
+  isExportSupported,
+  isDesktopApp,
   settings,
   setSettings,
   isExporting,
   exportProgress,
   exportStatus,
   onFileUpload,
+  onPickAudio,
+  onPickImage,
   onRemoveTrack,
   onUpdateTrackInfo,
   onSelectTrack,
   onExport,
 }) => {
   const [activeTab, setActiveTab] = useState<"media" | "style" | "export">("media");
+  const exportTrack = playlist[currentTrackIndex] ?? playlist[0] ?? null;
+  const hasTrack = Boolean(exportTrack);
+  const hasSourcePath = Boolean(exportTrack?.sourcePath);
+  const exportDisabled = isExporting || !hasTrack || !isExportSupported;
+  const exportHint = !isExportSupported
+    ? "Desktop app required"
+    : !hasTrack
+      ? "Add audio to enable export"
+      : hasSourcePath
+        ? "Choose save location"
+        : "First export will ask for source file";
 
   const randomizeVibe = () => {
     const randomColor = PRESET_COLORS[Math.floor(Math.random() * PRESET_COLORS.length)];
@@ -99,35 +118,43 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
 
               <div className="relative group">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => onFileUpload(e, "image")}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                />
-                <div
-                  className={`h-32 border border-dashed border-white/10 rounded-sm flex flex-col items-center justify-center transition-all duration-300 group-hover:border-plasma/50 group-hover:bg-white/5 ${backgroundImage ? "bg-zinc-900/50" : "bg-black/20"}`}
+                {!isDesktopApp && (
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => onFileUpload(e, "image")}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                  />
+                )}
+                <button
+                  type="button"
+                  onClick={isDesktopApp ? onPickImage : undefined}
+                  className={`w-full text-left ${isDesktopApp ? "cursor-pointer" : "cursor-default"}`}
                 >
-                  {backgroundImage ? (
-                    <div className="relative w-full h-full overflow-hidden">
-                      <img
-                        src={backgroundImage}
-                        className="object-cover w-full h-full opacity-60 group-hover:opacity-100 transition-opacity"
-                        alt="Background"
-                      />
-                      <div className="absolute bottom-2 right-2 bg-black/80 text-plasma text-[9px] px-2 py-0.5 font-mono uppercase">
-                        IMG Loaded
+                  <div
+                    className={`h-32 border border-dashed border-white/10 rounded-sm flex flex-col items-center justify-center transition-all duration-300 group-hover:border-plasma/50 group-hover:bg-white/5 ${backgroundImage ? "bg-zinc-900/50" : "bg-black/20"}`}
+                  >
+                    {backgroundImage ? (
+                      <div className="relative w-full h-full overflow-hidden">
+                        <img
+                          src={backgroundImage}
+                          className="object-cover w-full h-full opacity-60 group-hover:opacity-100 transition-opacity"
+                          alt="Background"
+                        />
+                        <div className="absolute bottom-2 right-2 bg-black/80 text-plasma text-[9px] px-2 py-0.5 font-mono uppercase">
+                          IMG Loaded
+                        </div>
                       </div>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center gap-2">
-                      <Icons.Image className="w-5 h-5 text-zinc-700 group-hover:text-plasma transition-colors" />
-                      <span className="text-[9px] text-zinc-600 font-mono uppercase">
-                        Drop Image
-                      </span>
-                    </div>
-                  )}
-                </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-2">
+                        <Icons.Image className="w-5 h-5 text-zinc-700 group-hover:text-plasma transition-colors" />
+                        <span className="text-[9px] text-zinc-600 font-mono uppercase">
+                          {isDesktopApp ? "Pick Image" : "Drop Image"}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </button>
               </div>
             </div>
 
@@ -143,16 +170,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
 
               <div className="relative group">
-                <input
-                  type="file"
-                  accept="audio/*"
-                  multiple
-                  onChange={(e) => onFileUpload(e, "audio")}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                />
-                <button className="btn-mechanical w-full py-3 flex items-center justify-center gap-2">
+                {!isDesktopApp && (
+                  <input
+                    type="file"
+                    accept="audio/*"
+                    multiple
+                    onChange={(e) => onFileUpload(e, "audio")}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                  />
+                )}
+                <button
+                  type="button"
+                  onClick={isDesktopApp ? onPickAudio : undefined}
+                  className="btn-mechanical w-full py-3 flex items-center justify-center gap-2"
+                >
                   <Icons.Upload className="w-3 h-3" />
-                  <span>Import Tracks</span>
+                  <span>{isDesktopApp ? "Pick Tracks" : "Import Tracks"}</span>
                 </button>
               </div>
 
@@ -414,9 +447,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* EXPORT TAB */}
         {activeTab === "export" && (
           <div className="h-full flex flex-col justify-center items-center text-center space-y-6 p-4 animate-in fade-in slide-in-from-left-4 duration-300">
-            <div className="w-20 h-20 border border-white/10 bg-black/20 flex items-center justify-center relative group">
-              <div className="absolute inset-0 border-2 border-transparent group-hover:border-plasma/50 transition-all scale-110 opacity-0 group-hover:opacity-100"></div>
-              <Icons.Download className="w-8 h-8 text-zinc-600 group-hover:text-plasma transition-colors" />
+            <div className="w-full border border-white/10 bg-black/20 p-4 flex items-center gap-3">
+              <div className="w-10 h-10 border border-white/10 bg-black/40 flex items-center justify-center">
+                <Icons.Download className="w-5 h-5 text-plasma" />
+              </div>
+              <div className="text-left">
+                <div className="text-[11px] font-bold text-white uppercase tracking-widest">
+                  Export Video
+                </div>
+                <div className="text-[10px] text-zinc-500 font-mono uppercase">
+                  Native render to .mp4
+                </div>
+              </div>
             </div>
 
             <div className="w-full border-t border-b border-white/5 py-4 space-y-2">
@@ -432,39 +474,60 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
               <div className="flex justify-between text-[10px] font-mono text-zinc-500 uppercase">
                 <span>Dur</span>
-                <span className="text-zinc-300">
-                  {formatTime(playlist.reduce((acc, t) => acc + t.duration, 0))}
-                </span>
+                <span className="text-zinc-300">{formatTime(exportTrack?.duration ?? 0)}</span>
               </div>
               <div className="flex justify-between text-[10px] font-mono text-zinc-500 uppercase">
                 <span>FPS</span>
                 <span className="text-zinc-300">30</span>
               </div>
+              <div className="flex justify-between text-[10px] font-mono text-zinc-500 uppercase">
+                <span>Track</span>
+                <span className="text-zinc-300">
+                  {exportTrack?.name ? exportTrack.name : "None"}
+                </span>
+              </div>
+              <div className="flex justify-between text-[10px] font-mono text-zinc-500 uppercase">
+                <span>Source</span>
+                <span className={hasSourcePath ? "text-zinc-300" : "text-amber-300"}>
+                  {hasSourcePath ? "Linked" : "Needs_File"}
+                </span>
+              </div>
             </div>
 
-            {isExporting && (
+            {(isExporting || exportStatus) && (
               <div className="w-full space-y-2">
-                <div className="flex justify-between text-[10px] font-mono text-plasma uppercase animate-pulse">
+                <div
+                  className={`flex justify-between text-[10px] font-mono uppercase ${
+                    isExporting ? "text-plasma animate-pulse" : "text-zinc-400"
+                  }`}
+                >
                   <span>{exportStatus}</span>
-                  <span>{exportProgress}%</span>
+                  {isExporting && <span>{exportProgress}%</span>}
                 </div>
-                <div className="h-1 bg-zinc-900 w-full overflow-hidden">
-                  <div
-                    className="h-full bg-plasma transition-all duration-300 ease-out"
-                    style={{ width: `${exportProgress}%` }}
-                  ></div>
-                </div>
+                {isExporting && (
+                  <div className="h-1 bg-zinc-900 w-full overflow-hidden">
+                    <div
+                      className="h-full bg-plasma transition-all duration-300 ease-out"
+                      style={{ width: `${exportProgress}%` }}
+                    ></div>
+                  </div>
+                )}
               </div>
             )}
 
             <button
               id="export-btn"
               onClick={onExport}
-              disabled={isExporting || playlist.length === 0}
+              disabled={exportDisabled}
               className="btn-mechanical w-full py-4 text-plasma border-plasma/30 hover:bg-plasma hover:text-black disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isExporting ? "Rendering..." : "Initiate_Render_Sequence"}
+              {!isExportSupported
+                ? "Desktop_App_Required"
+                : isExporting
+                  ? "Rendering..."
+                  : "Export_Video_.mp4"}
             </button>
+            <div className="text-[9px] text-zinc-600 font-mono uppercase">{exportHint}</div>
           </div>
         )}
       </div>

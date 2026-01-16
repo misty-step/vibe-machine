@@ -3,11 +3,32 @@
  *
  * Hides: dialogs, path handling, IPC params, progress listener, state transitions.
  * Exposes: isSupported(), attachProgressListener(), startExport()
+ *
+ * ## State Machine (see docs/STATE_FLOWS.md for Mermaid diagram)
+ *
+ * ```
+ * Idle -> GuardPlatform -> GuardConcurrency -> GuardTrack -> OutputDialog
+ *      -> ResolveAudio -> [AudioDialog] -> Rendering -> Progress -> Complete -> Idle
+ *                                                    \-> Error -> Idle
+ * ```
+ *
+ * Key transitions:
+ * - User cancels any dialog -> return to Idle (no state change)
+ * - IPC throws -> Error state with message
+ * - FFmpeg non-zero exit -> Error via progress listener
+ * - progress=100% -> auto-reset to Idle after 3s
  */
 
-import { isTauri, tauriDialogs, tauriInvoke, tauriListen } from "../platform/tauriEnv";
+import {
+  isTauri,
+  normalizeFilePath,
+  tauriDialogs,
+  tauriInvoke,
+  tauriListen,
+} from "../platform/tauriEnv";
 import { useVibeStore } from "../store/vibeStore";
 import { AspectRatio, VibeSettings } from "../types";
+import { renderTextOverlay } from "./renderTextOverlay";
 
 export interface ExportController {
   isSupported(): boolean;
@@ -56,7 +77,7 @@ export function createExportController(): ExportController {
 
       const listen = await tauriListen();
       const unlisten = await listen<ExportProgressPayload>("export-progress", (event) => {
-        const { isExporting, setExportState } = useVibeStore.getState();
+        const { isExporting, setExportState, exportSessionId } = useVibeStore.getState();
 
         // Ignore stale events if not exporting
         if (!isExporting) return;
@@ -64,11 +85,13 @@ export function createExportController(): ExportController {
         const pct = Math.min(100, Math.max(0, Math.round(event.payload.progress * 100)));
         setExportState(true, pct, event.payload.status);
 
-        // Auto-reset after completion
+        // Auto-reset after completion (guarded by session ID)
         if (pct >= 100) {
+          const sessionAtComplete = exportSessionId;
           setTimeout(() => {
             const current = useVibeStore.getState();
-            if (current.exportProgress >= 100) {
+            // Only reset if still on same session - prevents stale timeout race
+            if (current.exportSessionId === sessionAtComplete && current.exportProgress >= 100) {
               current.setExportState(false, 0, "");
             }
           }, 3000);
@@ -79,7 +102,16 @@ export function createExportController(): ExportController {
     },
 
     async startExport(): Promise<void> {
-      const { setExportState, isExporting, settings, playlist } = useVibeStore.getState();
+      const {
+        setExportState,
+        startExportSession,
+        isExporting,
+        settings,
+        playlist,
+        currentTrackId,
+        updateTrackInfo,
+        backgroundImagePath,
+      } = useVibeStore.getState();
 
       // Platform guard
       if (!isTauri()) {
@@ -92,54 +124,73 @@ export function createExportController(): ExportController {
         return;
       }
 
-      // Playlist guard
+      // Track guard
       if (playlist.length === 0) {
-        setExportState(false, 0, "Add audio tracks first");
+        setExportState(false, 0, "Add audio to enable export");
         return;
       }
+
+      const currentTrack = playlist.find((t) => t.id === currentTrackId) ?? playlist[0] ?? null;
 
       try {
         const dialogs = await tauriDialogs();
 
-        // 1. Pick audio source file
-        const audioPath = await dialogs.open({
-          filters: [
-            {
-              name: "Audio",
-              extensions: ["mp3", "wav", "flac", "m4a", "aac", "ogg"],
-            },
-          ],
-          multiple: false,
-        });
-
-        if (!audioPath || Array.isArray(audioPath)) {
-          return; // Cancelled - no state change
-        }
-
-        // 2. Pick output path
-        const outputPath = await dialogs.save({
+        // 1. Pick output path (primary intent)
+        const outputPathRaw = await dialogs.save({
           filters: [{ name: "Video", extensions: ["mp4"] }],
+          defaultPath: currentTrack?.name ? `${currentTrack.name}.mp4` : undefined,
         });
 
-        if (!outputPath) {
+        if (!outputPathRaw) {
           return; // Cancelled - no state change
         }
 
-        // 3. Start export
+        const outputPath = /\.mp4$/i.test(outputPathRaw) ? outputPathRaw : `${outputPathRaw}.mp4`;
+
+        // 2. Resolve audio source path
+        let audioPath = currentTrack?.sourcePath;
+
+        if (!audioPath) {
+          setExportState(false, 0, "Select source audio for export");
+          const pickedRaw = await dialogs.open({
+            filters: [
+              {
+                name: "Audio",
+                extensions: ["mp3", "wav", "flac", "m4a", "aac", "ogg"],
+              },
+            ],
+            multiple: false,
+          });
+
+          if (!pickedRaw || Array.isArray(pickedRaw)) {
+            return; // Cancelled - no state change
+          }
+
+          audioPath = normalizeFilePath(pickedRaw);
+          if (currentTrack?.id) {
+            updateTrackInfo(currentTrack.id, "sourcePath", audioPath);
+          }
+        }
+
+        // 3. Start export (new session prevents stale timeout race)
+        startExportSession();
         setExportState(true, 0, "Initializing Native Forge...");
 
         const { width, height } = getResolution(settings.aspectRatio);
+        const textOverlay = await renderTextOverlay(settings, currentTrack, width, height);
         const invoke = await tauriInvoke();
 
         await invoke("export_video", {
           params: {
             audio_path: audioPath,
-            image_path: "", // MVP: no background image export yet
+            image_path: backgroundImagePath ?? "",
             output_path: outputPath,
             settings: mapSettingsToRust(settings),
             fps: 30,
             width,
             height,
+            show_progress: settings.showProgress,
+            text_overlay_png_base64: textOverlay,
           },
         });
 

@@ -33,13 +33,17 @@ interface VibeState {
 
   // Visual Assets
   backgroundImage: string | null; // Object URL
+  backgroundImagePath: string | null; // Absolute path (desktop only)
   setBackgroundImage: (url: string | null) => void;
+  setBackgroundImagePath: (path: string | null) => void;
 
   // Export State
   isExporting: boolean;
   exportProgress: number;
   exportStatus: string;
+  exportSessionId: number; // Prevents stale timeout resets
   setExportState: (isExporting: boolean, progress?: number, status?: string) => void;
+  startExportSession: () => number; // Returns new session ID
 }
 
 const DEFAULT_SETTINGS: VibeSettings = {
@@ -126,13 +130,21 @@ export const useVibeStore = create<VibeState>()(
 
     // Assets
     backgroundImage: null,
+    backgroundImagePath: null,
     setBackgroundImage: (url) => set({ backgroundImage: url }),
+    setBackgroundImagePath: (path) => set({ backgroundImagePath: path }),
 
     // Export
     isExporting: false,
     exportProgress: 0,
     exportStatus: "",
+    exportSessionId: 0,
     setExportState: (isExporting, progress = 0, status = "") =>
       set({ isExporting, exportProgress: progress, exportStatus: status }),
+    startExportSession: () => {
+      const newId = get().exportSessionId + 1;
+      set({ isExporting: true, exportProgress: 0, exportStatus: "", exportSessionId: newId });
+      return newId;
+    },
   }))
 );

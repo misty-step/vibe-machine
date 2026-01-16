@@ -52,3 +52,16 @@ jobs:
         run: |
           DMG=$(find src-tauri/target -name "*.dmg" | head -1)
           node scripts/upload-release.mjs "$DMG" "${{ env.RELEASE_TAG }}"
+
+      - name: Update Homebrew Tap
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          if [ -z "$HOMEBREW_TAP_TOKEN" ]; then
+            echo "::warning::HOMEBREW_TAP_TOKEN not set, skipping Homebrew update"
+            exit 0
+          fi
+          DMG=$(find src-tauri/target -name "*.dmg" | head -1)
+          SHA256=$(shasum -a 256 "$DMG" | awk '{print $1}')
+          VERSION="${RELEASE_TAG#v}"
+          ./scripts/update-homebrew-cask.sh "$VERSION" "$SHA256" "$HOMEBREW_TAP_TOKEN"

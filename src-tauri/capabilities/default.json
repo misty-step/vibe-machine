@@ -3,5 +3,16 @@
   "identifier": "default",
   "description": "enables the default permissions",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": [
+    "core:default",
+    "dialog:default",
+    {
+      "identifier": "shell:allow-spawn",
+      "allow": [{ "name": "ffmpeg", "sidecar": true }]
+    },
+    {
+      "identifier": "shell:allow-stdin-write",
+      "allow": [{ "name": "ffmpeg", "sidecar": true }]
+    }
+  ]
 }

@@ -22,6 +22,14 @@ export const getAudioDuration = (file: File): Promise<number> => {
   });
 };
 
+export const getAudioDurationFromUrl = (url: string): Promise<number> => {
+  return new Promise((resolve) => {
+    const audio = new Audio(url);
+    audio.onloadedmetadata = () => resolve(audio.duration);
+    audio.onerror = () => resolve(0);
+  });
+};
+
 export const hexToRgb = (hex: string): { r: number; g: number; b: number } | null => {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   return result

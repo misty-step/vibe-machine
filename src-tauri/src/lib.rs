@@ -1,4 +1,5 @@
 mod export_video;
+mod export_frame;
 mod path_guard;
 
 use export_video::export_video;

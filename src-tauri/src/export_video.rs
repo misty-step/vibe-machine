@@ -1,5 +1,6 @@
 //! Video export pipeline - decode audio, render frames, pipe to FFmpeg.
 
+use crate::export_frame::{FrameComposer, OverlayConfig};
 use crate::path_guard::guard_export_paths;
 use spectrum_analyzer::windows::hann_window;
 use spectrum_analyzer::{samples_fft_to_spectrum, scaling::divide_by_N_sqrt, FrequencyLimit};
@@ -31,6 +32,10 @@ pub struct ExportParams {
     pub fps: u32,
     pub width: i32,
     pub height: i32,
+    #[serde(default)]
+    pub show_progress: bool,
+    #[serde(default)]
+    pub text_overlay_png_base64: String,
 }
 
 #[tauri::command]
@@ -42,16 +47,19 @@ pub async fn export_video(app: tauri::AppHandle, params: ExportParams) -> Result
         fps,
         width,
         height,
+        image_path,
+        show_progress,
+        text_overlay_png_base64,
         ..
     } = params;
 
     // Validate paths BEFORE any file operations
-    let guarded = guard_export_paths(&audio_path, &output_path)?;
+    let guarded = guard_export_paths(&audio_path, &output_path, &image_path)?;
     let start_time = std::time::Instant::now();
 
     // Log export start (basename only for security)
     log::info!(
-        "Starting export: audio={}, output={}",
+        "Starting export: audio={}, output={}, image={}",
         guarded
             .audio
             .file_name()
@@ -61,7 +69,13 @@ pub async fn export_video(app: tauri::AppHandle, params: ExportParams) -> Result
             .output
             .file_name()
             .and_then(|n| n.to_str())
-            .unwrap_or("unknown")
+            .unwrap_or("unknown"),
+        guarded
+            .image
+            .as_ref()
+            .and_then(|p| p.file_name())
+            .and_then(|n| n.to_str())
+            .unwrap_or("none")
     );
 
     // 1. Setup Audio Decoding using guarded path
@@ -82,45 +96,7 @@ pub async fn export_video(app: tauri::AppHandle, params: ExportParams) -> Result
         .make(&track.codec_params, &decoder_opts)
         .map_err(|e| e.to_string())?;
 
-    // 2. Setup FFmpeg Pipe using guarded paths
-    let sidecar = app.shell().sidecar("ffmpeg").map_err(|e| e.to_string())?;
-    let (mut rx, mut child) = sidecar
-        .args([
-            "-y",
-            "-f",
-            "rawvideo",
-            "-pixel_format",
-            "bgra",
-            "-video_size",
-            &format!("{}x{}", width, height),
-            "-framerate",
-            &fps.to_string(),
-            "-i",
-            "-", // stdin
-            "-i",
-            guarded.audio.to_str().ok_or("Invalid audio path encoding")?,
-            "-map",
-            "0:v",
-            "-map",
-            "1:a",
-            "-c:v",
-            "libx264",
-            "-pix_fmt",
-            "yuv420p",
-            "-c:a",
-            "aac",
-            "-shortest",
-            guarded
-                .output
-                .to_str()
-                .ok_or("Invalid output path encoding")?,
-        ])
-        .spawn()
-        .map_err(|e| e.to_string())?;
-
-    // 3. Rendering Loop
-    let mut engine = VibeEngine::new(width, height);
-
+    // 2. Decode ALL audio BEFORE spawning FFmpeg (fail-fast, no process leak)
     let _ = app.emit(
         "export-progress",
         ExportProgress {
@@ -152,17 +128,78 @@ pub async fn export_video(app: tauri::AppHandle, params: ExportParams) -> Result
         }
     }
 
-    // Render
     if audio_buffer.is_empty() {
         return Err("Audio decode produced no samples".into());
     }
 
-    let total_frames =
-        ((audio_buffer.len() as f64 / actual_sample_rate as f64) * fps as f64).ceil() as usize;
-    let samples_per_frame = ((actual_sample_rate as f64 / fps as f64).ceil()) as usize;
+    // 3. Setup FrameComposer BEFORE spawning FFmpeg (fail-fast)
+    let mut engine = VibeEngine::new(width, height);
+
+    let accent_rgb = hex_to_rgb(&settings.visualizer_color);
+    let overlay = OverlayConfig {
+        show_progress,
+        accent_rgb,
+    };
+    // Use guarded image path (already validated)
+    let guarded_image_str = guarded
+        .image
+        .as_ref()
+        .and_then(|p| p.to_str())
+        .unwrap_or("");
+    let composer = FrameComposer::new(
+        width,
+        height,
+        guarded_image_str,
+        overlay,
+        &text_overlay_png_base64,
+    )?;
+    // Composer owns the size; callers don't compute independently
+    let mut frame = vec![0u8; composer.frame_size()];
+
+    // Compute timing: use f64 for precision, avoid cumulative drift
+    let audio_duration_secs = audio_buffer.len() as f64 / actual_sample_rate as f64;
+    let total_frames = (audio_duration_secs * fps as f64).ceil() as usize;
+    let samples_per_frame_f64 = actual_sample_rate as f64 / fps as f64;
+
+    // 4. NOW spawn FFmpeg - all validation complete, nothing can fail before render loop
+    let sidecar = app.shell().sidecar("ffmpeg").map_err(|e| e.to_string())?;
+    let (mut rx, mut child) = sidecar
+        .args([
+            "-y",
+            "-f",
+            "rawvideo",
+            "-pixel_format",
+            "rgba",
+            "-video_size",
+            &format!("{}x{}", width, height),
+            "-framerate",
+            &fps.to_string(),
+            "-i",
+            "-", // stdin
+            "-i",
+            guarded.audio.to_str().ok_or("Invalid audio path encoding")?,
+            "-map",
+            "0:v",
+            "-map",
+            "1:a",
+            "-c:v",
+            "libx264",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "aac",
+            "-shortest",
+            guarded
+                .output
+                .to_str()
+                .ok_or("Invalid output path encoding")?,
+        ])
+        .spawn()
+        .map_err(|e| e.to_string())?;
 
     for i in 0..total_frames {
-        let sample_idx = i * samples_per_frame;
+        // Float accumulator prevents A/V sync drift from integer rounding
+        let sample_idx = (i as f64 * samples_per_frame_f64).floor() as usize;
 
         // Prepare FFT Data
         let freq_data_u8 = if sample_idx + FFT_WINDOW <= audio_buffer.len() {
@@ -177,9 +214,10 @@ pub async fn export_video(app: tauri::AppHandle, params: ExportParams) -> Result
         // Engine Render
         engine.render_native(&settings, &freq_data_u8);
 
-        // Write
+        // Compose frame (background + viz + overlays) then write
         let pixels = engine.get_pixel_slice();
-        child.write(pixels).map_err(|e| e.to_string())?;
+        composer.compose_into(pixels, i, total_frames, &mut frame);
+        child.write(&frame).map_err(|e| e.to_string())?;
 
         if i % 30 == 0 {
             let _ = app.emit(
@@ -217,6 +255,25 @@ pub async fn export_video(app: tauri::AppHandle, params: ExportParams) -> Result
     );
 
     Ok(())
+}
+
+fn hex_to_rgb(hex: &str) -> (u8, u8, u8) {
+    const FALLBACK: (u8, u8, u8) = (255, 183, 3); // Plasma fallback
+
+    let h = hex.trim_start_matches('#');
+    if h.len() != 6 {
+        return FALLBACK;
+    }
+
+    if let (Ok(r), Ok(g), Ok(b)) = (
+        u8::from_str_radix(&h[0..2], 16),
+        u8::from_str_radix(&h[2..4], 16),
+        u8::from_str_radix(&h[4..6], 16),
+    ) {
+        (r, g, b)
+    } else {
+        FALLBACK
+    }
 }
 
 fn build_fft_bins(window: &[f32], sample_rate: u32) -> Vec<u8> {

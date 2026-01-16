@@ -5,7 +5,18 @@
 
 /** Check if running inside Tauri environment */
 export function isTauri(): boolean {
-  return typeof window !== "undefined" && "__TAURI__" in window;
+  if (typeof window === "undefined") return false;
+  // Tauri v2 always injects __TAURI_INTERNALS__; __TAURI__ only when withGlobalTauri=true.
+  return "__TAURI_INTERNALS__" in window || "__TAURI__" in window;
+}
+
+export function normalizeFilePath(path: string): string {
+  if (path.startsWith("file://")) {
+    let stripped = decodeURIComponent(path.replace("file://", ""));
+    if (/^\/[A-Za-z]:\//.test(stripped)) stripped = stripped.slice(1);
+    return stripped;
+  }
+  return path;
 }
 
 /** Dynamic import for Tauri dialog APIs */
@@ -29,6 +40,14 @@ export async function tauriInvoke(): Promise<
 > {
   const { invoke } = await import("@tauri-apps/api/core");
   return invoke;
+}
+
+/** Dynamic import for Tauri convertFileSrc */
+export async function tauriConvertFileSrc(): Promise<
+  (filePath: string, protocol?: string) => string
+> {
+  const { convertFileSrc } = await import("@tauri-apps/api/core");
+  return convertFileSrc;
 }
 
 /** Dynamic import for Tauri event listener */
