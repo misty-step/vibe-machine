@@ -156,7 +156,7 @@ const App: React.FC = () => {
             <Icons.Video className="w-3 h-3 text-black" />
           </div>
           <h1 className="text-xs font-bold tracking-widest text-white uppercase font-mono">
-            Vibe_Machine <span className="text-zinc-600">v2.0</span>
+            Vibe_Machine <span className="text-zinc-600">v1.1</span>
           </h1>
         </div>
         <div className="flex gap-4 items-center text-[10px] font-bold text-zinc-500 tracking-wide font-mono uppercase">

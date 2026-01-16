@@ -19,9 +19,10 @@ const versioned = await put(`releases/vibe-machine-${version}.dmg`, content, {
 });
 console.log(`Uploaded: ${versioned.url}`);
 
-// Upload as "latest" for stable URL
+// Upload as "latest" for stable URL (overwrite previous)
 const latest = await put("releases/vibe-machine-latest.dmg", content, {
   access: "public",
   addRandomSuffix: false,
+  allowOverwrite: true,
 });
 console.log(`Latest: ${latest.url}`);

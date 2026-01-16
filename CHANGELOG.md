@@ -2,11 +2,10 @@
 
 ## [1.1.1](https://github.com/misty-step/vibe-machine/compare/v1.1.0...v1.1.1) (2026-01-16)
 
-
 ### Bug Fixes
 
-* **ci:** unify release workflow to auto-build on version bump ([a66dce7](https://github.com/misty-step/vibe-machine/commit/a66dce787df5fc171153748db32de890a065d037))
-* **export:** sync export overlay with preview ([#6](https://github.com/misty-step/vibe-machine/issues/6)) ([4dd5c74](https://github.com/misty-step/vibe-machine/commit/4dd5c748aaddbf952ac88dd12109bc44764c9854))
+- **ci:** unify release workflow to auto-build on version bump ([a66dce7](https://github.com/misty-step/vibe-machine/commit/a66dce787df5fc171153748db32de890a065d037))
+- **export:** sync export overlay with preview ([#6](https://github.com/misty-step/vibe-machine/issues/6)) ([4dd5c74](https://github.com/misty-step/vibe-machine/commit/4dd5c748aaddbf952ac88dd12109bc44764c9854))
 
 ## [1.1.0](https://github.com/misty-step/vibe-machine/compare/v1.0.1...v1.1.0) (2025-12-16)
 
