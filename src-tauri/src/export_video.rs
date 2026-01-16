@@ -243,14 +243,22 @@ pub async fn export_video(app: tauri::AppHandle, params: ExportParams) -> Result
 }
 
 fn hex_to_rgb(hex: &str) -> (u8, u8, u8) {
+    const FALLBACK: (u8, u8, u8) = (255, 183, 3); // Plasma fallback
+
     let h = hex.trim_start_matches('#');
-    if h.len() == 6 {
-        let r = u8::from_str_radix(&h[0..2], 16).unwrap_or(255);
-        let g = u8::from_str_radix(&h[2..4], 16).unwrap_or(255);
-        let b = u8::from_str_radix(&h[4..6], 16).unwrap_or(255);
-        return (r, g, b);
+    if h.len() != 6 {
+        return FALLBACK;
     }
-    (255, 183, 3) // Plasma fallback
+
+    if let (Ok(r), Ok(g), Ok(b)) = (
+        u8::from_str_radix(&h[0..2], 16),
+        u8::from_str_radix(&h[2..4], 16),
+        u8::from_str_radix(&h[4..6], 16),
+    ) {
+        (r, g, b)
+    } else {
+        FALLBACK
+    }
 }
 
 fn build_fft_bins(window: &[f32], sample_rate: u32) -> Vec<u8> {

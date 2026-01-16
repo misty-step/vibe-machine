@@ -55,7 +55,7 @@ impl FrameComposer {
         out: &mut [u8],
     ) {
         out.copy_from_slice(&self.background);
-        overlay_engine(engine_pixels, out);
+        overlay_rgba(engine_pixels, out);
         if let Some(text) = &self.text_overlay {
             overlay_rgba(&text.pixels, out);
         }
@@ -92,16 +92,17 @@ fn load_text_overlay(width: usize, height: usize, base64_png: &str) -> Result<Ov
 }
 
 fn load_background(width: usize, height: usize, image_path: &str) -> Result<Vec<u8>, String> {
-    let mut buffer = vec![0u8; width * height * 4];
-    fill_solid(&mut buffer, width, height, (3, 3, 4));
-
     if image_path.is_empty() {
+        let mut buffer = vec![0u8; width * height * 4];
+        fill_solid(&mut buffer, width, height, (3, 3, 4));
         return Ok(buffer);
     }
 
     let image = image::open(image_path).map_err(|e| format!("image load failed: {}", e))?;
     let (iw, ih) = image.dimensions();
     if iw == 0 || ih == 0 {
+        let mut buffer = vec![0u8; width * height * 4];
+        fill_solid(&mut buffer, width, height, (3, 3, 4));
         return Ok(buffer);
     }
 
@@ -114,16 +115,7 @@ fn load_background(width: usize, height: usize, image_path: &str) -> Result<Vec<
     let cropped: RgbaImage =
         image::imageops::crop_imm(&resized, x, y, width as u32, height as u32).to_image();
 
-    for (i, pixel) in cropped.pixels().enumerate() {
-        let [r, g, b, a] = pixel.0;
-        let idx = i * 4;
-        buffer[idx] = r;
-        buffer[idx + 1] = g;
-        buffer[idx + 2] = b;
-        buffer[idx + 3] = a;
-    }
-
-    Ok(buffer)
+    Ok(cropped.into_raw())
 }
 
 fn fill_solid(buffer: &mut [u8], width: usize, height: usize, rgb: (u8, u8, u8)) {
@@ -135,26 +127,6 @@ fn fill_solid(buffer: &mut [u8], width: usize, height: usize, rgb: (u8, u8, u8))
             buffer[idx + 2] = rgb.2;
             buffer[idx + 3] = 255;
         }
-    }
-}
-
-fn overlay_engine(engine_pixels: &[u8], out: &mut [u8]) {
-    for i in (0..engine_pixels.len()).step_by(4) {
-        let alpha = engine_pixels[i + 3];
-        if alpha == 0 {
-            continue;
-        }
-        if alpha == 255 {
-            out[i..i + 4].copy_from_slice(&engine_pixels[i..i + 4]);
-            continue;
-        }
-        let inv = 255 - alpha;
-        for c in 0..3 {
-            let src = engine_pixels[i + c] as u16;
-            let dst = out[i + c] as u16;
-            out[i + c] = ((src * alpha as u16 + dst * inv as u16) / 255) as u8;
-        }
-        out[i + 3] = 255;
     }
 }
 

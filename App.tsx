@@ -78,7 +78,7 @@ const App: React.FC = () => {
           typeof (file as { path?: unknown }).path === "string"
             ? String((file as { path?: string }).path)
             : null;
-        if (sourcePath) setBackgroundImagePath(sourcePath);
+        setBackgroundImagePath(sourcePath);
       } else {
         const files = Array.from(e.target.files) as File[];
         await engine.addTracks(files);
@@ -99,6 +99,10 @@ const App: React.FC = () => {
       });
       if (!imagePathRaw || Array.isArray(imagePathRaw)) return;
       const imagePath = normalizeFilePath(imagePathRaw);
+      // Revoke old blob URL if switching from browser upload to native pick
+      if (backgroundImage?.startsWith("blob:")) {
+        URL.revokeObjectURL(backgroundImage);
+      }
       setBackgroundImage(convertFileSrc(imagePath));
       setBackgroundImagePath(imagePath);
       return;
