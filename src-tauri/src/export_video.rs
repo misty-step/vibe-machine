@@ -54,12 +54,12 @@ pub async fn export_video(app: tauri::AppHandle, params: ExportParams) -> Result
     } = params;
 
     // Validate paths BEFORE any file operations
-    let guarded = guard_export_paths(&audio_path, &output_path)?;
+    let guarded = guard_export_paths(&audio_path, &output_path, &image_path)?;
     let start_time = std::time::Instant::now();
 
     // Log export start (basename only for security)
     log::info!(
-        "Starting export: audio={}, output={}",
+        "Starting export: audio={}, output={}, image={}",
         guarded
             .audio
             .file_name()
@@ -69,7 +69,13 @@ pub async fn export_video(app: tauri::AppHandle, params: ExportParams) -> Result
             .output
             .file_name()
             .and_then(|n| n.to_str())
-            .unwrap_or("unknown")
+            .unwrap_or("unknown"),
+        guarded
+            .image
+            .as_ref()
+            .and_then(|p| p.file_name())
+            .and_then(|n| n.to_str())
+            .unwrap_or("none")
     );
 
     // 1. Setup Audio Decoding using guarded path
@@ -90,7 +96,72 @@ pub async fn export_video(app: tauri::AppHandle, params: ExportParams) -> Result
         .make(&track.codec_params, &decoder_opts)
         .map_err(|e| e.to_string())?;
 
-    // 2. Setup FFmpeg Pipe using guarded paths
+    // 2. Decode ALL audio BEFORE spawning FFmpeg (fail-fast, no process leak)
+    let _ = app.emit(
+        "export-progress",
+        ExportProgress {
+            progress: 0.0,
+            status: "Decoding Audio...".into(),
+        },
+    );
+
+    let mut audio_buffer: Vec<f32> = Vec::new();
+    let mut actual_sample_rate = 44100;
+
+    while let Ok(packet) = format.next_packet() {
+        if packet.track_id() != track_id {
+            continue;
+        }
+        let decoded = decoder.decode(&packet).map_err(|e| e.to_string())?;
+
+        let spec = *decoded.spec();
+        actual_sample_rate = spec.rate;
+        let mut sample_buf = SampleBuffer::<f32>::new(decoded.capacity() as u64, spec);
+        sample_buf.copy_interleaved_ref(decoded);
+
+        // Mono mix
+        let samples = sample_buf.samples();
+        let channels = spec.channels.count();
+        for chunk in samples.chunks(channels) {
+            let sum: f32 = chunk.iter().sum();
+            audio_buffer.push(sum / channels as f32);
+        }
+    }
+
+    if audio_buffer.is_empty() {
+        return Err("Audio decode produced no samples".into());
+    }
+
+    // 3. Setup FrameComposer BEFORE spawning FFmpeg (fail-fast)
+    let mut engine = VibeEngine::new(width, height);
+
+    let accent_rgb = hex_to_rgb(&settings.visualizer_color);
+    let overlay = OverlayConfig {
+        show_progress,
+        accent_rgb,
+    };
+    // Use guarded image path (already validated)
+    let guarded_image_str = guarded
+        .image
+        .as_ref()
+        .and_then(|p| p.to_str())
+        .unwrap_or("");
+    let composer = FrameComposer::new(
+        width,
+        height,
+        guarded_image_str,
+        overlay,
+        &text_overlay_png_base64,
+    )?;
+    // Composer owns the size; callers don't compute independently
+    let mut frame = vec![0u8; composer.frame_size()];
+
+    // Compute timing: use f64 for precision, avoid cumulative drift
+    let audio_duration_secs = audio_buffer.len() as f64 / actual_sample_rate as f64;
+    let total_frames = (audio_duration_secs * fps as f64).ceil() as usize;
+    let samples_per_frame_f64 = actual_sample_rate as f64 / fps as f64;
+
+    // 4. NOW spawn FFmpeg - all validation complete, nothing can fail before render loop
     let sidecar = app.shell().sidecar("ffmpeg").map_err(|e| e.to_string())?;
     let (mut rx, mut child) = sidecar
         .args([
@@ -126,65 +197,9 @@ pub async fn export_video(app: tauri::AppHandle, params: ExportParams) -> Result
         .spawn()
         .map_err(|e| e.to_string())?;
 
-    // 3. Rendering Loop
-    let mut engine = VibeEngine::new(width, height);
-
-    let accent_rgb = hex_to_rgb(&settings.visualizer_color);
-    let overlay = OverlayConfig {
-        show_progress,
-        accent_rgb,
-    };
-    let composer = FrameComposer::new(
-        width,
-        height,
-        &image_path,
-        overlay,
-        &text_overlay_png_base64,
-    )?;
-    let mut frame = vec![0u8; (width.max(1) * height.max(1)) as usize * 4];
-
-    let _ = app.emit(
-        "export-progress",
-        ExportProgress {
-            progress: 0.0,
-            status: "Decoding Audio...".into(),
-        },
-    );
-
-    let mut audio_buffer: Vec<f32> = Vec::new();
-    let mut actual_sample_rate = 44100;
-
-    while let Ok(packet) = format.next_packet() {
-        if packet.track_id() != track_id {
-            continue;
-        }
-        let decoded = decoder.decode(&packet).map_err(|e| e.to_string())?;
-
-        let spec = *decoded.spec();
-        actual_sample_rate = spec.rate;
-        let mut sample_buf = SampleBuffer::<f32>::new(decoded.capacity() as u64, spec);
-        sample_buf.copy_interleaved_ref(decoded);
-
-        // Mono mix
-        let samples = sample_buf.samples();
-        let channels = spec.channels.count();
-        for chunk in samples.chunks(channels) {
-            let sum: f32 = chunk.iter().sum();
-            audio_buffer.push(sum / channels as f32);
-        }
-    }
-
-    // Render
-    if audio_buffer.is_empty() {
-        return Err("Audio decode produced no samples".into());
-    }
-
-    let total_frames =
-        ((audio_buffer.len() as f64 / actual_sample_rate as f64) * fps as f64).ceil() as usize;
-    let samples_per_frame = ((actual_sample_rate as f64 / fps as f64).ceil()) as usize;
-
     for i in 0..total_frames {
-        let sample_idx = i * samples_per_frame;
+        // Float accumulator prevents A/V sync drift from integer rounding
+        let sample_idx = (i as f64 * samples_per_frame_f64).floor() as usize;
 
         // Prepare FFT Data
         let freq_data_u8 = if sample_idx + FFT_WINDOW <= audio_buffer.len() {

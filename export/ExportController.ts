@@ -3,6 +3,20 @@
  *
  * Hides: dialogs, path handling, IPC params, progress listener, state transitions.
  * Exposes: isSupported(), attachProgressListener(), startExport()
+ *
+ * ## State Machine (see docs/STATE_FLOWS.md for Mermaid diagram)
+ *
+ * ```
+ * Idle -> GuardPlatform -> GuardConcurrency -> GuardTrack -> OutputDialog
+ *      -> ResolveAudio -> [AudioDialog] -> Rendering -> Progress -> Complete -> Idle
+ *                                                    \-> Error -> Idle
+ * ```
+ *
+ * Key transitions:
+ * - User cancels any dialog -> return to Idle (no state change)
+ * - IPC throws -> Error state with message
+ * - FFmpeg non-zero exit -> Error via progress listener
+ * - progress=100% -> auto-reset to Idle after 3s
  */
 
 import {
@@ -63,7 +77,7 @@ export function createExportController(): ExportController {
 
       const listen = await tauriListen();
       const unlisten = await listen<ExportProgressPayload>("export-progress", (event) => {
-        const { isExporting, setExportState } = useVibeStore.getState();
+        const { isExporting, setExportState, exportSessionId } = useVibeStore.getState();
 
         // Ignore stale events if not exporting
         if (!isExporting) return;
@@ -71,11 +85,13 @@ export function createExportController(): ExportController {
         const pct = Math.min(100, Math.max(0, Math.round(event.payload.progress * 100)));
         setExportState(true, pct, event.payload.status);
 
-        // Auto-reset after completion
+        // Auto-reset after completion (guarded by session ID)
         if (pct >= 100) {
+          const sessionAtComplete = exportSessionId;
           setTimeout(() => {
             const current = useVibeStore.getState();
-            if (current.exportProgress >= 100) {
+            // Only reset if still on same session - prevents stale timeout race
+            if (current.exportSessionId === sessionAtComplete && current.exportProgress >= 100) {
               current.setExportState(false, 0, "");
             }
           }, 3000);
@@ -88,6 +104,7 @@ export function createExportController(): ExportController {
     async startExport(): Promise<void> {
       const {
         setExportState,
+        startExportSession,
         isExporting,
         settings,
         playlist,
@@ -155,7 +172,8 @@ export function createExportController(): ExportController {
           }
         }
 
-        // 3. Start export
+        // 3. Start export (new session prevents stale timeout race)
+        startExportSession();
         setExportState(true, 0, "Initializing Native Forge...");
 
         const { width, height } = getResolution(settings.aspectRatio);

@@ -32,6 +32,10 @@ impl FrameComposer {
     ) -> Result<Self, String> {
         let width = width.max(1) as usize;
         let height = height.max(1) as usize;
+
+        // Validate dimensions once; eliminates overflow everywhere else
+        let _ = checked_frame_size(width, height)?;
+
         let background = load_background(width, height, image_path)?;
         let text_overlay = if text_overlay_base64.is_empty() {
             None
@@ -47,6 +51,13 @@ impl FrameComposer {
         })
     }
 
+    /// Returns the exact buffer size required for `compose_into`.
+    /// Caller allocates once; no size ambiguity.
+    pub fn frame_size(&self) -> usize {
+        self.width * self.height * 4
+    }
+
+    /// Compose a frame. Panics if buffer sizes mismatch (indicates caller bug).
     pub fn compose_into(
         &self,
         engine_pixels: &[u8],
@@ -54,6 +65,22 @@ impl FrameComposer {
         total_frames: usize,
         out: &mut [u8],
     ) {
+        let expected = self.frame_size();
+        assert_eq!(
+            engine_pixels.len(),
+            expected,
+            "engine buffer size mismatch: got {}, expected {}",
+            engine_pixels.len(),
+            expected
+        );
+        assert_eq!(
+            out.len(),
+            expected,
+            "output buffer size mismatch: got {}, expected {}",
+            out.len(),
+            expected
+        );
+
         out.copy_from_slice(&self.background);
         overlay_rgba(engine_pixels, out);
         if let Some(text) = &self.text_overlay {
@@ -68,6 +95,14 @@ impl FrameComposer {
             &self.overlay,
         );
     }
+}
+
+/// Validates frame dimensions and returns byte size. Fails early on overflow.
+fn checked_frame_size(width: usize, height: usize) -> Result<usize, String> {
+    width
+        .checked_mul(height)
+        .and_then(|n| n.checked_mul(4))
+        .ok_or_else(|| format!("frame dimensions too large: {}x{}", width, height))
 }
 
 struct OverlayImage {
@@ -92,8 +127,11 @@ fn load_text_overlay(width: usize, height: usize, base64_png: &str) -> Result<Ov
 }
 
 fn load_background(width: usize, height: usize, image_path: &str) -> Result<Vec<u8>, String> {
+    // Dimensions already validated by caller; use checked_frame_size for consistency
+    let size = checked_frame_size(width, height)?;
+
     if image_path.is_empty() {
-        let mut buffer = vec![0u8; width * height * 4];
+        let mut buffer = vec![0u8; size];
         fill_solid(&mut buffer, width, height, (3, 3, 4));
         return Ok(buffer);
     }
@@ -101,7 +139,7 @@ fn load_background(width: usize, height: usize, image_path: &str) -> Result<Vec<
     let image = image::open(image_path).map_err(|e| format!("image load failed: {}", e))?;
     let (iw, ih) = image.dimensions();
     if iw == 0 || ih == 0 {
-        let mut buffer = vec![0u8; width * height * 4];
+        let mut buffer = vec![0u8; size];
         fill_solid(&mut buffer, width, height, (3, 3, 4));
         return Ok(buffer);
     }

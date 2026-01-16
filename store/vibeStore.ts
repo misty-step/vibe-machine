@@ -41,7 +41,9 @@ interface VibeState {
   isExporting: boolean;
   exportProgress: number;
   exportStatus: string;
+  exportSessionId: number; // Prevents stale timeout resets
   setExportState: (isExporting: boolean, progress?: number, status?: string) => void;
+  startExportSession: () => number; // Returns new session ID
 }
 
 const DEFAULT_SETTINGS: VibeSettings = {
@@ -136,7 +138,13 @@ export const useVibeStore = create<VibeState>()(
     isExporting: false,
     exportProgress: 0,
     exportStatus: "",
+    exportSessionId: 0,
     setExportState: (isExporting, progress = 0, status = "") =>
       set({ isExporting, exportProgress: progress, exportStatus: status }),
+    startExportSession: () => {
+      const newId = get().exportSessionId + 1;
+      set({ isExporting: true, exportProgress: 0, exportStatus: "", exportSessionId: newId });
+      return newId;
+    },
   }))
 );
