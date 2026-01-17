@@ -27,6 +27,7 @@ export class AudioSystem {
   private gainNode: GainNode | null = null;
   private sourceNode: MediaElementAudioSourceNode | null = null;
   private audioEl: HTMLAudioElement;
+  private currentBlobUrl: string | null = null;
 
   private static instance: AudioSystem | null = null;
 
@@ -104,7 +105,16 @@ export class AudioSystem {
     }
   }
 
-  private async loadTrack(trackId: string | null) {
+  private revokeBlobUrl(): void {
+    if (this.currentBlobUrl) {
+      URL.revokeObjectURL(this.currentBlobUrl);
+      this.currentBlobUrl = null;
+    }
+  }
+
+  private async loadTrack(trackId: string | null): Promise<void> {
+    this.revokeBlobUrl();
+
     if (!trackId) {
       this.audioEl.src = "";
       return;
@@ -113,23 +123,34 @@ export class AudioSystem {
     const playlist = useVibeStore.getState().playlist;
     const track = playlist.find((t) => t.id === trackId);
 
-    if (track) {
+    if (!track) {
+      this.audioEl.src = "";
+      return;
+    }
+
+    try {
       console.log(`[AudioSystem] Loading track: ${track.name}`);
+
       if (track.sourcePath && isTauri()) {
         const convertFileSrc = await tauriConvertFileSrc();
         this.audioEl.src = convertFileSrc(track.sourcePath);
       } else if (track.file) {
-        const url = URL.createObjectURL(track.file);
-        this.audioEl.src = url;
+        this.currentBlobUrl = URL.createObjectURL(track.file);
+        this.audioEl.src = this.currentBlobUrl;
       } else {
         console.warn("[AudioSystem] Track missing source data.");
         this.audioEl.src = "";
       }
-      this.audioEl.load(); // Explicit load
+
+      this.audioEl.load();
 
       if (useVibeStore.getState().isPlaying) {
         this.play();
       }
+    } catch (error) {
+      console.error(`[AudioSystem] Failed to load track "${track.name}":`, error);
+      this.audioEl.src = "";
+      this.revokeBlobUrl();
     }
   }
 
