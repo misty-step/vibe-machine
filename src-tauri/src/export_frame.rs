@@ -39,12 +39,16 @@ impl FrameComposer {
 
         let background = load_background(width, height, image_path)?;
 
-        // Load text overlay for each track
+        // Load text overlay for each track (preserve index alignment - empty = transparent)
         let mut track_overlays = Vec::with_capacity(track_overlay_base64s.len());
         for (i, base64) in track_overlay_base64s.iter().enumerate() {
-            if !base64.is_empty() {
-                track_overlays.push(load_text_overlay(width, height, base64)
-                    .map_err(|e| format!("track {} overlay: {}", i + 1, e))?);
+            if base64.is_empty() {
+                track_overlays.push(OverlayImage { pixels: vec![] });
+            } else {
+                track_overlays.push(
+                    load_text_overlay(width, height, base64)
+                        .map_err(|e| format!("track {} overlay: {}", i + 1, e))?,
+                );
             }
         }
 
