@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/misty-step/vibe-machine/compare/v1.2.1...v1.3.0) (2026-01-17)
+
+
+### Features
+
+* support multi-track video export ([#70](https://github.com/misty-step/vibe-machine/issues/70)) ([344970c](https://github.com/misty-step/vibe-machine/commit/344970cdbf786f82a6a499f2fe57e226ca0f1a66))
+
 ## [1.2.1](https://github.com/misty-step/vibe-machine/compare/v1.2.0...v1.2.1) (2026-01-17)
 
 ### Bug Fixes
