@@ -8,14 +8,15 @@ if [[ ! "$COMMIT_MSG" =~ ^chore\(master\):\ release ]]; then
   exit 0
 fi
 
-# Extract version from commit message
-VERSION=$(echo "$COMMIT_MSG" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "")
+# Extract version from commit message (anchored pattern for robustness)
+VERSION=$(echo "$COMMIT_MSG" | sed -n 's/^chore(master): release \([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
 if [[ -z "$VERSION" ]]; then
   exit 0
 fi
 
 TAG="v$VERSION"
-LOG="/tmp/vibe-machine-update.log"
+LOG="$HOME/Library/Logs/vibe-machine-update.log"
+mkdir -p "$(dirname "$LOG")"
 
 notify() {
   osascript -e "display notification \"$1\" with title \"Vibe Machine\""
@@ -25,8 +26,8 @@ notify() {
   echo "$(date): Waiting for release $TAG to build..."
 
   # Poll for the release DMG (max 10 min)
-  for i in {1..60}; do
-    if gh release view "$TAG" --json assets -q '.assets[].name' 2>/dev/null | grep -q ".dmg"; then
+  for _ in {1..60}; do
+    if gh release view "$TAG" --json assets -q '.assets[].name' 2>/dev/null | grep -q '\.dmg$'; then
       echo "$(date): Release ready, installing..."
 
       # Check if app is running
@@ -37,13 +38,28 @@ notify() {
 
       # Install
       TMPDIR=$(mktemp -d)
-      trap "rm -rf $TMPDIR" EXIT
+      trap 'rm -rf "$TMPDIR"' EXIT
       gh release download "$TAG" --pattern "*.dmg" --dir "$TMPDIR"
-      DMG=$(ls "$TMPDIR"/*.dmg | head -1)
 
-      hdiutil attach "$DMG" -nobrowse -quiet
-      cp -Rf "/Volumes/vibe-machine/vibe-machine.app" /Applications/
-      hdiutil detach "/Volumes/vibe-machine" -quiet
+      DMG=$(find "$TMPDIR" -maxdepth 1 -name "*.dmg" -print -quit)
+      if [[ -z "$DMG" ]]; then
+        echo "$(date): Failed to find downloaded DMG for $TAG"
+        notify "Update $VERSION download failed"
+        exit 1
+      fi
+
+      # Mount and extract mount point dynamically
+      MOUNT_INFO=$(hdiutil attach "$DMG" -nobrowse 2>&1)
+      MOUNT_POINT=$(echo "$MOUNT_INFO" | tail -1 | awk '{print $NF}')
+      if [[ ! -d "$MOUNT_POINT" ]]; then
+        echo "$(date): Failed to mount DMG"
+        notify "Update $VERSION mount failed"
+        exit 1
+      fi
+
+      APP_PATH=$(find "$MOUNT_POINT" -maxdepth 1 -name "*.app" -print -quit)
+      cp -Rf "$APP_PATH" /Applications/
+      hdiutil detach "$MOUNT_POINT" -quiet
 
       notify "Updated to $VERSION ✓"
       echo "$(date): Installed $VERSION"
