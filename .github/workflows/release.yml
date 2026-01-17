@@ -37,6 +37,14 @@ jobs:
         with:
           ref: ${{ needs.release-please.outputs.tag_name }}
 
+      # Sync tauri.conf.json version from tag (release-please extra-files is unreliable)
+      - name: Sync Tauri version
+        run: |
+          VERSION="${RELEASE_TAG#v}"
+          jq --arg v "$VERSION" '.version = $v' src-tauri/tauri.conf.json > tmp.json
+          mv tmp.json src-tauri/tauri.conf.json
+          echo "Set tauri.conf.json version to $VERSION"
+
       - uses: pnpm/action-setup@v4
 
       - uses: actions/setup-node@v4
