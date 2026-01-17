@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.2](https://github.com/misty-step/vibe-machine/compare/v1.3.1...v1.3.2) (2026-01-17)
+
+
+### Bug Fixes
+
+* match FFT gain with Web Audio + per-track overlays ([#74](https://github.com/misty-step/vibe-machine/issues/74)) ([018f864](https://github.com/misty-step/vibe-machine/commit/018f864e01c4d5089c1552df4089b2affcb13781))
+* migrate test files to proper Vitest setup ([#47](https://github.com/misty-step/vibe-machine/issues/47)) ([#73](https://github.com/misty-step/vibe-machine/issues/73)) ([b3ff49d](https://github.com/misty-step/vibe-machine/commit/b3ff49de02f0e1d8324fc383a9e3f77e48737d0e))
+
 ## [1.3.1](https://github.com/misty-step/vibe-machine/compare/v1.3.0...v1.3.1) (2026-01-17)
 
 ### Bug Fixes
