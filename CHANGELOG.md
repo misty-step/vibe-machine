@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.1](https://github.com/misty-step/vibe-machine/compare/v1.3.0...v1.3.1) (2026-01-17)
+
+
+### Bug Fixes
+
+* display version from package.json instead of hardcoded value ([c3aa6da](https://github.com/misty-step/vibe-machine/commit/c3aa6da8c43ab95a52e8ad71acd80b5a62f57e5d))
+
 ## [1.3.0](https://github.com/misty-step/vibe-machine/compare/v1.2.1...v1.3.0) (2026-01-17)
 
 ### Features
