@@ -123,25 +123,34 @@ export class AudioSystem {
     const playlist = useVibeStore.getState().playlist;
     const track = playlist.find((t) => t.id === trackId);
 
-    if (!track) return;
-
-    console.log(`[AudioSystem] Loading track: ${track.name}`);
-
-    if (track.sourcePath && isTauri()) {
-      const convertFileSrc = await tauriConvertFileSrc();
-      this.audioEl.src = convertFileSrc(track.sourcePath);
-    } else if (track.file) {
-      this.currentBlobUrl = URL.createObjectURL(track.file);
-      this.audioEl.src = this.currentBlobUrl;
-    } else {
-      console.warn("[AudioSystem] Track missing source data.");
+    if (!track) {
       this.audioEl.src = "";
+      return;
     }
 
-    this.audioEl.load();
+    try {
+      console.log(`[AudioSystem] Loading track: ${track.name}`);
 
-    if (useVibeStore.getState().isPlaying) {
-      this.play();
+      if (track.sourcePath && isTauri()) {
+        const convertFileSrc = await tauriConvertFileSrc();
+        this.audioEl.src = convertFileSrc(track.sourcePath);
+      } else if (track.file) {
+        this.currentBlobUrl = URL.createObjectURL(track.file);
+        this.audioEl.src = this.currentBlobUrl;
+      } else {
+        console.warn("[AudioSystem] Track missing source data.");
+        this.audioEl.src = "";
+      }
+
+      this.audioEl.load();
+
+      if (useVibeStore.getState().isPlaying) {
+        this.play();
+      }
+    } catch (error) {
+      console.error(`[AudioSystem] Failed to load track "${track.name}":`, error);
+      this.audioEl.src = "";
+      this.revokeBlobUrl();
     }
   }
 
