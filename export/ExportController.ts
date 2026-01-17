@@ -169,7 +169,19 @@ export function createExportController(): ExportController {
         );
 
         const { width, height } = getResolution(settings.aspectRatio);
-        const textOverlay = await renderTextOverlay(settings, firstTrack, width, height);
+
+        // Generate text overlay for each track
+        const trackOverlays = await Promise.all(
+          playlist.map((track) => renderTextOverlay(settings, track, width, height))
+        );
+
+        // Calculate cumulative track boundaries (seconds)
+        let cumulative = 0;
+        const trackBoundaries = playlist.map((track) => {
+          cumulative += track.duration ?? 0;
+          return cumulative;
+        });
+
         const invoke = await tauriInvoke();
 
         await invoke("export_video", {
@@ -182,7 +194,8 @@ export function createExportController(): ExportController {
             width,
             height,
             show_progress: settings.showProgress,
-            text_overlay_png_base64: textOverlay,
+            track_overlays: trackOverlays,
+            track_boundaries: trackBoundaries,
           },
         });
 

@@ -18,6 +18,10 @@ use vibe_engine::{VibeEngine, VibeSettings};
 const FFT_BINS: usize = 64;
 const FFT_WINDOW: usize = 2048;
 
+// Match Web Audio AnalyserNode's dB scaling (default minDecibels/maxDecibels)
+const MIN_DECIBELS: f32 = -100.0;
+const MAX_DECIBELS: f32 = -30.0;
+
 /// Decoded audio ready for visualization and export.
 struct DecodedAudio {
     samples: Vec<f32>,
@@ -141,8 +145,13 @@ pub struct ExportParams {
     pub height: i32,
     #[serde(default)]
     pub show_progress: bool,
+    /// Text overlay PNG (base64) for each track - indexed by track order
     #[serde(default)]
-    pub text_overlay_png_base64: String,
+    pub track_overlays: Vec<String>,
+    /// Cumulative duration boundaries in seconds for track switching
+    /// e.g., [180.0, 360.0, 540.0] means track 1 ends at 180s, track 2 at 360s, etc.
+    #[serde(default)]
+    pub track_boundaries: Vec<f64>,
 }
 
 #[tauri::command]
@@ -156,8 +165,8 @@ pub async fn export_video(app: tauri::AppHandle, params: ExportParams) -> Result
         height,
         image_path,
         show_progress,
-        text_overlay_png_base64,
-        ..
+        track_overlays,
+        track_boundaries,
     } = params;
 
     // Validate paths BEFORE any file operations
@@ -220,7 +229,7 @@ pub async fn export_video(app: tauri::AppHandle, params: ExportParams) -> Result
         height,
         guarded_image_str,
         overlay,
-        &text_overlay_png_base64,
+        &track_overlays,
     )?;
     // Composer owns the size; callers don't compute independently
     let mut frame = vec![0u8; composer.frame_size()];
@@ -273,9 +282,21 @@ pub async fn export_video(app: tauri::AppHandle, params: ExportParams) -> Result
         .spawn()
         .map_err(|e| e.to_string())?;
 
+    // Helper to find active track index based on current time
+    let find_active_track = |time_secs: f64| -> usize {
+        track_boundaries
+            .iter()
+            .position(|&boundary| time_secs < boundary)
+            .unwrap_or(track_boundaries.len().saturating_sub(1).max(0))
+    };
+
     for i in 0..total_frames {
         // Float accumulator prevents A/V sync drift from integer rounding
         let sample_idx = (i as f64 * samples_per_frame_f64).floor() as usize;
+        let current_time_secs = i as f64 / fps as f64;
+
+        // Determine which track is currently playing
+        let active_track_index = find_active_track(current_time_secs);
 
         // Prepare FFT Data
         let freq_data_u8 = if sample_idx + FFT_WINDOW <= audio.samples.len() {
@@ -292,7 +313,7 @@ pub async fn export_video(app: tauri::AppHandle, params: ExportParams) -> Result
 
         // Compose frame (background + viz + overlays) then write
         let pixels = engine.get_pixel_slice();
-        composer.compose_into(pixels, i, total_frames, &mut frame);
+        composer.compose_into(pixels, i, total_frames, active_track_index, &mut frame);
         child.write(&frame).map_err(|e| e.to_string())?;
 
         if i % 30 == 0 {
@@ -352,6 +373,18 @@ fn hex_to_rgb(hex: &str) -> (u8, u8, u8) {
     }
 }
 
+/// Convert FFT magnitude to byte using dB scaling (matches Web Audio AnalyserNode.getByteFrequencyData)
+fn magnitude_to_byte(magnitude: f32) -> u8 {
+    // Avoid log10(0) - use small epsilon
+    let magnitude = magnitude.max(1e-10);
+    // Convert to decibels: dB = 20 * log10(magnitude)
+    let db = 20.0 * magnitude.log10();
+    // Normalize to 0-1 range using Web Audio's default dB range
+    let normalized = (db - MIN_DECIBELS) / (MAX_DECIBELS - MIN_DECIBELS);
+    // Clamp and convert to byte
+    (normalized.clamp(0.0, 1.0) * 255.0) as u8
+}
+
 fn build_fft_bins(window: &[f32], sample_rate: u32) -> Vec<u8> {
     let hann = hann_window(window);
     let spectrum = match samples_fft_to_spectrum(
@@ -376,7 +409,7 @@ fn build_fft_bins(window: &[f32], sample_rate: u32) -> Vec<u8> {
             }
         }
         let avg = sum / step as f32;
-        *bin = (avg * 1000.0).min(255.0) as u8;
+        *bin = magnitude_to_byte(avg);
     }
 
     bins
