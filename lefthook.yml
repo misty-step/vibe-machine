@@ -25,3 +25,8 @@ pre-push:
       run: cargo clippy --manifest-path=src-tauri/Cargo.toml -- -D warnings
     vibe-engine-clippy:
       run: cargo clippy --manifest-path=crates/vibe-engine/Cargo.toml -- -D warnings
+
+post-merge:
+  commands:
+    auto-update:
+      run: ./scripts/auto-update-app.sh & # Runs in background, only for release merges

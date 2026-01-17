@@ -2,10 +2,9 @@
 
 ## [1.1.3](https://github.com/misty-step/vibe-machine/compare/v1.1.2...v1.1.3) (2026-01-17)
 
-
 ### Bug Fixes
 
-* **ci:** sync tauri.conf.json version at build time ([#64](https://github.com/misty-step/vibe-machine/issues/64)) ([4271d61](https://github.com/misty-step/vibe-machine/commit/4271d610a4f7451eb340ec5c89f2d185ef7e82a3))
+- **ci:** sync tauri.conf.json version at build time ([#64](https://github.com/misty-step/vibe-machine/issues/64)) ([4271d61](https://github.com/misty-step/vibe-machine/commit/4271d610a4f7451eb340ec5c89f2d185ef7e82a3))
 
 ## [1.1.2](https://github.com/misty-step/vibe-machine/compare/v1.1.1...v1.1.2) (2026-01-16)
 
