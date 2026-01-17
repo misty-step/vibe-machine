@@ -19,7 +19,8 @@ pub struct FrameComposer {
     height: usize,
     background: Vec<u8>, // RGBA
     overlay: OverlayConfig,
-    text_overlay: Option<OverlayImage>,
+    /// Text overlays for each track (indexed by track number)
+    track_overlays: Vec<OverlayImage>,
 }
 
 impl FrameComposer {
@@ -28,7 +29,7 @@ impl FrameComposer {
         height: i32,
         image_path: &str,
         overlay: OverlayConfig,
-        text_overlay_base64: &str,
+        track_overlay_base64s: &[String],
     ) -> Result<Self, String> {
         let width = width.max(1) as usize;
         let height = height.max(1) as usize;
@@ -37,17 +38,22 @@ impl FrameComposer {
         let _ = checked_frame_size(width, height)?;
 
         let background = load_background(width, height, image_path)?;
-        let text_overlay = if text_overlay_base64.is_empty() {
-            None
-        } else {
-            Some(load_text_overlay(width, height, text_overlay_base64)?)
-        };
+
+        // Load text overlay for each track
+        let mut track_overlays = Vec::with_capacity(track_overlay_base64s.len());
+        for (i, base64) in track_overlay_base64s.iter().enumerate() {
+            if !base64.is_empty() {
+                track_overlays.push(load_text_overlay(width, height, base64)
+                    .map_err(|e| format!("track {} overlay: {}", i + 1, e))?);
+            }
+        }
+
         Ok(Self {
             width,
             height,
             background,
             overlay,
-            text_overlay,
+            track_overlays,
         })
     }
 
@@ -58,11 +64,14 @@ impl FrameComposer {
     }
 
     /// Compose a frame. Panics if buffer sizes mismatch (indicates caller bug).
+    ///
+    /// `active_track_index` determines which track's text overlay to use.
     pub fn compose_into(
         &self,
         engine_pixels: &[u8],
         frame_index: usize,
         total_frames: usize,
+        active_track_index: usize,
         out: &mut [u8],
     ) {
         let expected = self.frame_size();
@@ -83,9 +92,12 @@ impl FrameComposer {
 
         out.copy_from_slice(&self.background);
         overlay_rgba(engine_pixels, out);
-        if let Some(text) = &self.text_overlay {
+
+        // Use the active track's text overlay
+        if let Some(text) = self.track_overlays.get(active_track_index) {
             overlay_rgba(&text.pixels, out);
         }
+
         draw_progress(
             out,
             self.width,
