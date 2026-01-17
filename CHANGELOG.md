@@ -2,17 +2,15 @@
 
 ## [1.2.1](https://github.com/misty-step/vibe-machine/compare/v1.2.0...v1.2.1) (2026-01-17)
 
-
 ### Bug Fixes
 
-* remove unused @morphllm/morphmcp dependency (3 vulnerabilities) ([#68](https://github.com/misty-step/vibe-machine/issues/68)) ([144b152](https://github.com/misty-step/vibe-machine/commit/144b1523b025ae9dcb108162d9c4cad6d44489ce)), closes [#56](https://github.com/misty-step/vibe-machine/issues/56)
+- remove unused @morphllm/morphmcp dependency (3 vulnerabilities) ([#68](https://github.com/misty-step/vibe-machine/issues/68)) ([144b152](https://github.com/misty-step/vibe-machine/commit/144b1523b025ae9dcb108162d9c4cad6d44489ce)), closes [#56](https://github.com/misty-step/vibe-machine/issues/56)
 
 ## [1.2.0](https://github.com/misty-step/vibe-machine/compare/v1.1.3...v1.2.0) (2026-01-17)
 
-
 ### Features
 
-* add post-merge auto-update hook for local dev ([#66](https://github.com/misty-step/vibe-machine/issues/66)) ([0bc7dfd](https://github.com/misty-step/vibe-machine/commit/0bc7dfdb3c30b069e36202711bbf75541d6ed849))
+- add post-merge auto-update hook for local dev ([#66](https://github.com/misty-step/vibe-machine/issues/66)) ([0bc7dfd](https://github.com/misty-step/vibe-machine/commit/0bc7dfdb3c30b069e36202711bbf75541d6ed849))
 
 ## [1.1.3](https://github.com/misty-step/vibe-machine/compare/v1.1.2...v1.1.3) (2026-01-17)
 

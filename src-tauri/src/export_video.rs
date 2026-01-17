@@ -1,19 +1,125 @@
 //! Video export pipeline - decode audio, render frames, pipe to FFmpeg.
 
 use crate::export_frame::{FrameComposer, OverlayConfig};
-use crate::path_guard::guard_export_paths;
+use crate::path_guard::guard_multi_track_paths;
 use spectrum_analyzer::windows::hann_window;
 use spectrum_analyzer::{samples_fft_to_spectrum, scaling::divide_by_N_sqrt, FrequencyLimit};
+use std::io::Write;
+use std::path::Path;
 use symphonia::core::audio::SampleBuffer;
 use symphonia::core::io::MediaSourceStream;
 use symphonia::core::probe::Hint;
 use tauri::Emitter;
 use tauri_plugin_shell::process::CommandEvent;
 use tauri_plugin_shell::ShellExt;
+use tempfile::{NamedTempFile, TempPath};
 use vibe_engine::{VibeEngine, VibeSettings};
 
 const FFT_BINS: usize = 64;
 const FFT_WINDOW: usize = 2048;
+
+/// Decoded audio ready for visualization and export.
+struct DecodedAudio {
+    samples: Vec<f32>,
+    sample_rate: u32,
+}
+
+/// Decode multiple audio files into a single buffer.
+/// All tracks must have the same sample rate (fails fast if mismatch).
+fn decode_tracks(paths: &[impl AsRef<Path>]) -> Result<DecodedAudio, String> {
+    let mut samples: Vec<f32> = Vec::new();
+    let mut expected_rate: Option<u32> = None;
+
+    for (i, path) in paths.iter().enumerate() {
+        let path = path.as_ref();
+        let track_num = i + 1;
+
+        let src = std::fs::File::open(path)
+            .map_err(|e| format!("Failed to open track {}: {}", track_num, e))?;
+        let mss = MediaSourceStream::new(Box::new(src), Default::default());
+
+        let probed = symphonia::default::get_probe()
+            .format(&Hint::new(), mss, &Default::default(), &Default::default())
+            .map_err(|e| format!("Failed to probe track {}: {}", track_num, e))?;
+
+        let mut format = probed.format;
+        let track = format
+            .default_track()
+            .ok_or_else(|| format!("No audio stream in track {}", track_num))?;
+        let track_id = track.id;
+
+        let mut decoder = symphonia::default::get_codecs()
+            .make(&track.codec_params, &Default::default())
+            .map_err(|e| format!("Failed to create decoder for track {}: {}", track_num, e))?;
+
+        while let Ok(packet) = format.next_packet() {
+            if packet.track_id() != track_id {
+                continue;
+            }
+
+            let decoded = decoder
+                .decode(&packet)
+                .map_err(|e| format!("Decode error in track {}: {}", track_num, e))?;
+
+            let spec = *decoded.spec();
+
+            // Validate sample rate consistency (fail-fast)
+            match expected_rate {
+                None => expected_rate = Some(spec.rate),
+                Some(rate) if rate != spec.rate => {
+                    return Err(format!(
+                        "Sample rate mismatch: track {} is {}Hz, but previous tracks are {}Hz. \
+                         All tracks must have the same sample rate.",
+                        track_num, spec.rate, rate
+                    ));
+                }
+                _ => {}
+            }
+
+            let mut sample_buf = SampleBuffer::<f32>::new(decoded.capacity() as u64, spec);
+            sample_buf.copy_interleaved_ref(decoded);
+
+            // Mono mixdown
+            let channels = spec.channels.count();
+            for chunk in sample_buf.samples().chunks(channels) {
+                let sum: f32 = chunk.iter().sum();
+                samples.push(sum / channels as f32);
+            }
+        }
+    }
+
+    let sample_rate = expected_rate.ok_or("No audio data decoded")?;
+    if samples.is_empty() {
+        return Err("Audio decode produced no samples".into());
+    }
+
+    Ok(DecodedAudio { samples, sample_rate })
+}
+
+/// Create FFmpeg concat list file with proper path escaping.
+/// Returns TempPath that keeps the file alive until dropped.
+fn create_concat_file(paths: &[impl AsRef<Path>]) -> Result<TempPath, String> {
+    let file = NamedTempFile::new()
+        .map_err(|e| format!("Failed to create concat file: {}", e))?;
+
+    {
+        let mut writer = std::io::BufWriter::new(&file);
+        for path in paths {
+            let path_str = path.as_ref().to_str().ok_or("Invalid path encoding")?;
+            // Escape for FFmpeg concat format:
+            // 1. Backslashes (Windows paths) - escape first
+            // 2. Single quotes - use shell-style escaping
+            let escaped = path_str
+                .replace('\\', "\\\\")
+                .replace('\'', "'\\''");
+            writeln!(writer, "file '{}'", escaped).map_err(|e| e.to_string())?;
+        }
+        writer.flush().map_err(|e| e.to_string())?;
+    }
+
+    // Convert to TempPath - file persists until TempPath is dropped
+    Ok(file.into_temp_path())
+}
 
 #[derive(Clone, serde::Serialize)]
 pub struct ExportProgress {
@@ -23,7 +129,8 @@ pub struct ExportProgress {
 
 #[derive(serde::Deserialize)]
 pub struct ExportParams {
-    pub audio_path: String,
+    /// Multiple audio paths to concatenate (in order)
+    pub audio_paths: Vec<String>,
     #[serde(default)]
     #[allow(dead_code)]
     pub image_path: String,
@@ -41,7 +148,7 @@ pub struct ExportParams {
 #[tauri::command]
 pub async fn export_video(app: tauri::AppHandle, params: ExportParams) -> Result<(), String> {
     let ExportParams {
-        audio_path,
+        audio_paths,
         output_path,
         settings,
         fps,
@@ -54,17 +161,13 @@ pub async fn export_video(app: tauri::AppHandle, params: ExportParams) -> Result
     } = params;
 
     // Validate paths BEFORE any file operations
-    let guarded = guard_export_paths(&audio_path, &output_path, &image_path)?;
+    let guarded = guard_multi_track_paths(&audio_paths, &output_path, &image_path)?;
     let start_time = std::time::Instant::now();
 
-    // Log export start (basename only for security)
+    // Log export start
     log::info!(
-        "Starting export: audio={}, output={}, image={}",
-        guarded
-            .audio
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("unknown"),
+        "Starting export: {} audio tracks, output={}, image={}",
+        guarded.audio_paths.len(),
         guarded
             .output
             .file_name()
@@ -78,59 +181,25 @@ pub async fn export_video(app: tauri::AppHandle, params: ExportParams) -> Result
             .unwrap_or("none")
     );
 
-    // 1. Setup Audio Decoding using guarded path
-    let src = std::fs::File::open(&guarded.audio).map_err(|e| e.to_string())?;
-    let mss = MediaSourceStream::new(Box::new(src), Default::default());
-    let hint = Hint::new();
-    let format_opts = Default::default();
-    let metadata_opts = Default::default();
-    let decoder_opts = Default::default();
-
-    let probed = symphonia::default::get_probe()
-        .format(&hint, mss, &format_opts, &metadata_opts)
-        .map_err(|e| e.to_string())?;
-    let mut format = probed.format;
-    let track = format.default_track().ok_or("No track found")?;
-    let track_id = track.id;
-    let mut decoder = symphonia::default::get_codecs()
-        .make(&track.codec_params, &decoder_opts)
-        .map_err(|e| e.to_string())?;
-
-    // 2. Decode ALL audio BEFORE spawning FFmpeg (fail-fast, no process leak)
+    // 1. Decode ALL audio files BEFORE spawning FFmpeg (fail-fast on errors/mismatches)
     let _ = app.emit(
         "export-progress",
         ExportProgress {
             progress: 0.0,
-            status: "Decoding Audio...".into(),
+            status: format!("Decoding {} tracks...", guarded.audio_paths.len()),
         },
     );
 
-    let mut audio_buffer: Vec<f32> = Vec::new();
-    let mut actual_sample_rate = 44100;
+    let audio = decode_tracks(&guarded.audio_paths)?;
+    log::info!(
+        "Decoded {} samples at {}Hz from {} tracks",
+        audio.samples.len(),
+        audio.sample_rate,
+        guarded.audio_paths.len()
+    );
 
-    while let Ok(packet) = format.next_packet() {
-        if packet.track_id() != track_id {
-            continue;
-        }
-        let decoded = decoder.decode(&packet).map_err(|e| e.to_string())?;
-
-        let spec = *decoded.spec();
-        actual_sample_rate = spec.rate;
-        let mut sample_buf = SampleBuffer::<f32>::new(decoded.capacity() as u64, spec);
-        sample_buf.copy_interleaved_ref(decoded);
-
-        // Mono mix
-        let samples = sample_buf.samples();
-        let channels = spec.channels.count();
-        for chunk in samples.chunks(channels) {
-            let sum: f32 = chunk.iter().sum();
-            audio_buffer.push(sum / channels as f32);
-        }
-    }
-
-    if audio_buffer.is_empty() {
-        return Err("Audio decode produced no samples".into());
-    }
+    // 2. Create FFmpeg concat list (TempPath keeps file alive until function returns)
+    let concat_path_handle = create_concat_file(&guarded.audio_paths)?;
 
     // 3. Setup FrameComposer BEFORE spawning FFmpeg (fail-fast)
     let mut engine = VibeEngine::new(width, height);
@@ -157,12 +226,15 @@ pub async fn export_video(app: tauri::AppHandle, params: ExportParams) -> Result
     let mut frame = vec![0u8; composer.frame_size()];
 
     // Compute timing: use f64 for precision, avoid cumulative drift
-    let audio_duration_secs = audio_buffer.len() as f64 / actual_sample_rate as f64;
+    let audio_duration_secs = audio.samples.len() as f64 / audio.sample_rate as f64;
     let total_frames = (audio_duration_secs * fps as f64).ceil() as usize;
-    let samples_per_frame_f64 = actual_sample_rate as f64 / fps as f64;
+    let samples_per_frame_f64 = audio.sample_rate as f64 / fps as f64;
 
     // 4. NOW spawn FFmpeg - all validation complete, nothing can fail before render loop
     let sidecar = app.shell().sidecar("ffmpeg").map_err(|e| e.to_string())?;
+    let concat_path = concat_path_handle
+        .to_str()
+        .ok_or("Invalid concat file path encoding")?;
     let (mut rx, mut child) = sidecar
         .args([
             "-y",
@@ -175,9 +247,13 @@ pub async fn export_video(app: tauri::AppHandle, params: ExportParams) -> Result
             "-framerate",
             &fps.to_string(),
             "-i",
-            "-", // stdin
+            "-", // stdin (video frames)
+            "-f",
+            "concat",
+            "-safe",
+            "0",
             "-i",
-            guarded.audio.to_str().ok_or("Invalid audio path encoding")?,
+            concat_path, // audio from concat list
             "-map",
             "0:v",
             "-map",
@@ -202,10 +278,10 @@ pub async fn export_video(app: tauri::AppHandle, params: ExportParams) -> Result
         let sample_idx = (i as f64 * samples_per_frame_f64).floor() as usize;
 
         // Prepare FFT Data
-        let freq_data_u8 = if sample_idx + FFT_WINDOW <= audio_buffer.len() {
+        let freq_data_u8 = if sample_idx + FFT_WINDOW <= audio.samples.len() {
             build_fft_bins(
-                &audio_buffer[sample_idx..sample_idx + FFT_WINDOW],
-                actual_sample_rate,
+                &audio.samples[sample_idx..sample_idx + FFT_WINDOW],
+                audio.sample_rate,
             )
         } else {
             vec![0u8; FFT_BINS]

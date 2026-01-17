@@ -5,39 +5,74 @@
 
 use std::path::PathBuf;
 
-/// Validated export paths ready for use.
+/// Validated export paths ready for use (single audio).
+/// Used by tests and kept for backwards compatibility.
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct GuardedExportPaths {
     pub audio: PathBuf,
     pub output: PathBuf,
     pub image: Option<PathBuf>,
 }
 
-/// Validate and canonicalize export paths.
+/// Validated export paths for multi-track export.
+#[derive(Debug)]
+pub struct GuardedMultiTrackPaths {
+    pub audio_paths: Vec<PathBuf>,
+    pub output: PathBuf,
+    pub image: Option<PathBuf>,
+}
+
+/// Validate a single audio path.
+fn validate_audio_path(path: &str) -> Result<PathBuf, String> {
+    let audio = PathBuf::from(path);
+    if !audio.is_absolute() {
+        return Err(format!("audio path must be absolute: {}", path));
+    }
+    let audio = audio
+        .canonicalize()
+        .map_err(|e| format!("audio path canonicalize failed for '{}': {}", path, e))?;
+    if !audio.is_file() {
+        return Err(format!("audio path must be a file: {}", path));
+    }
+    Ok(audio)
+}
+
+/// Validate and canonicalize export paths for multi-track export.
 ///
 /// # Errors
 /// Returns human-readable error string on validation failure.
-pub fn guard_export_paths(
-    audio_path: &str,
+pub fn guard_multi_track_paths(
+    audio_paths: &[String],
     output_path: &str,
     image_path: &str,
-) -> Result<GuardedExportPaths, String> {
-    // Parse paths
-    let audio = PathBuf::from(audio_path);
+) -> Result<GuardedMultiTrackPaths, String> {
+    if audio_paths.is_empty() {
+        return Err("at least one audio path required".into());
+    }
+
+    // Validate all audio paths
+    let validated_audio: Vec<PathBuf> = audio_paths
+        .iter()
+        .map(|p| validate_audio_path(p))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    // Validate output and image (reuse existing logic)
+    let (output, image) = validate_output_and_image(output_path, image_path)?;
+
+    Ok(GuardedMultiTrackPaths {
+        audio_paths: validated_audio,
+        output,
+        image,
+    })
+}
+
+/// Validate output path and optional image path.
+fn validate_output_and_image(
+    output_path: &str,
+    image_path: &str,
+) -> Result<(PathBuf, Option<PathBuf>), String> {
     let output = PathBuf::from(output_path);
-
-    // Audio path validation
-    if !audio.is_absolute() {
-        return Err("audio_path must be absolute".into());
-    }
-
-    let audio = audio
-        .canonicalize()
-        .map_err(|e| format!("audio_path canonicalize failed: {}", e))?;
-
-    if !audio.is_file() {
-        return Err("audio_path must be a file".into());
-    }
 
     // Output path validation
     if !output.is_absolute() {
@@ -90,6 +125,23 @@ pub fn guard_export_paths(
         }
         Some(img)
     };
+
+    Ok((output, image))
+}
+
+/// Validate and canonicalize export paths (single audio).
+/// Used by tests and kept for backwards compatibility.
+///
+/// # Errors
+/// Returns human-readable error string on validation failure.
+#[allow(dead_code)]
+pub fn guard_export_paths(
+    audio_path: &str,
+    output_path: &str,
+    image_path: &str,
+) -> Result<GuardedExportPaths, String> {
+    let audio = validate_audio_path(audio_path)?;
+    let (output, image) = validate_output_and_image(output_path, image_path)?;
 
     Ok(GuardedExportPaths { audio, output, image })
 }
