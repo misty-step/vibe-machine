@@ -105,12 +105,17 @@ export class AudioSystem {
     }
   }
 
-  private async loadTrack(trackId: string | null) {
+  private revokeBlobUrl(): void {
+    if (this.currentBlobUrl) {
+      URL.revokeObjectURL(this.currentBlobUrl);
+      this.currentBlobUrl = null;
+    }
+  }
+
+  private async loadTrack(trackId: string | null): Promise<void> {
+    this.revokeBlobUrl();
+
     if (!trackId) {
-      if (this.currentBlobUrl) {
-        URL.revokeObjectURL(this.currentBlobUrl);
-        this.currentBlobUrl = null;
-      }
       this.audioEl.src = "";
       return;
     }
@@ -118,26 +123,25 @@ export class AudioSystem {
     const playlist = useVibeStore.getState().playlist;
     const track = playlist.find((t) => t.id === trackId);
 
-    if (track) {
-      console.log(`[AudioSystem] Loading track: ${track.name}`);
-      if (track.sourcePath && isTauri()) {
-        const convertFileSrc = await tauriConvertFileSrc();
-        this.audioEl.src = convertFileSrc(track.sourcePath);
-      } else if (track.file) {
-        if (this.currentBlobUrl) {
-          URL.revokeObjectURL(this.currentBlobUrl);
-        }
-        this.currentBlobUrl = URL.createObjectURL(track.file);
-        this.audioEl.src = this.currentBlobUrl;
-      } else {
-        console.warn("[AudioSystem] Track missing source data.");
-        this.audioEl.src = "";
-      }
-      this.audioEl.load(); // Explicit load
+    if (!track) return;
 
-      if (useVibeStore.getState().isPlaying) {
-        this.play();
-      }
+    console.log(`[AudioSystem] Loading track: ${track.name}`);
+
+    if (track.sourcePath && isTauri()) {
+      const convertFileSrc = await tauriConvertFileSrc();
+      this.audioEl.src = convertFileSrc(track.sourcePath);
+    } else if (track.file) {
+      this.currentBlobUrl = URL.createObjectURL(track.file);
+      this.audioEl.src = this.currentBlobUrl;
+    } else {
+      console.warn("[AudioSystem] Track missing source data.");
+      this.audioEl.src = "";
+    }
+
+    this.audioEl.load();
+
+    if (useVibeStore.getState().isPlaying) {
+      this.play();
     }
   }
 
