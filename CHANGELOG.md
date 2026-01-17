@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/misty-step/vibe-machine/compare/v1.1.3...v1.2.0) (2026-01-17)
+
+
+### Features
+
+* add post-merge auto-update hook for local dev ([#66](https://github.com/misty-step/vibe-machine/issues/66)) ([0bc7dfd](https://github.com/misty-step/vibe-machine/commit/0bc7dfdb3c30b069e36202711bbf75541d6ed849))
+
 ## [1.1.3](https://github.com/misty-step/vibe-machine/compare/v1.1.2...v1.1.3) (2026-01-17)
 
 ### Bug Fixes
