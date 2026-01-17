@@ -2,10 +2,9 @@
 
 ## [1.1.2](https://github.com/misty-step/vibe-machine/compare/v1.1.1...v1.1.2) (2026-01-16)
 
-
 ### Bug Fixes
 
-* sync versions and fix blob upload script ([98c6eb5](https://github.com/misty-step/vibe-machine/commit/98c6eb508be14d634d83957341325a76d2a6681c))
+- sync versions and fix blob upload script ([98c6eb5](https://github.com/misty-step/vibe-machine/commit/98c6eb508be14d634d83957341325a76d2a6681c))
 
 ## [1.1.1](https://github.com/misty-step/vibe-machine/compare/v1.1.0...v1.1.1) (2026-01-16)
 
