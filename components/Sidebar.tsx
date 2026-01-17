@@ -59,17 +59,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onExport,
 }) => {
   const [activeTab, setActiveTab] = useState<"media" | "style" | "export">("media");
-  const exportTrack = playlist[currentTrackIndex] ?? playlist[0] ?? null;
-  const hasTrack = Boolean(exportTrack);
-  const hasSourcePath = Boolean(exportTrack?.sourcePath);
+  const hasTrack = playlist.length > 0;
+  const tracksWithSource = playlist.filter((t) => Boolean(t.sourcePath));
+  const allTracksHaveSource = tracksWithSource.length === playlist.length && playlist.length > 0;
+  const totalDuration = playlist.reduce((sum, t) => sum + (t.duration ?? 0), 0);
   const exportDisabled = isExporting || !hasTrack || !isExportSupported;
   const exportHint = !isExportSupported
     ? "Desktop app required"
     : !hasTrack
       ? "Add audio to enable export"
-      : hasSourcePath
+      : allTracksHaveSource
         ? "Choose save location"
-        : "First export will ask for source file";
+        : `${playlist.length - tracksWithSource.length} track(s) need source files`;
 
   const randomizeVibe = () => {
     const randomColor = PRESET_COLORS[Math.floor(Math.random() * PRESET_COLORS.length)];
@@ -474,22 +475,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
               <div className="flex justify-between text-[10px] font-mono text-zinc-500 uppercase">
                 <span>Dur</span>
-                <span className="text-zinc-300">{formatTime(exportTrack?.duration ?? 0)}</span>
+                <span className="text-zinc-300">{formatTime(totalDuration)}</span>
               </div>
               <div className="flex justify-between text-[10px] font-mono text-zinc-500 uppercase">
                 <span>FPS</span>
                 <span className="text-zinc-300">30</span>
               </div>
               <div className="flex justify-between text-[10px] font-mono text-zinc-500 uppercase">
-                <span>Track</span>
+                <span>Tracks</span>
                 <span className="text-zinc-300">
-                  {exportTrack?.name ? exportTrack.name : "None"}
+                  {playlist.length === 0
+                    ? "None"
+                    : playlist.length === 1
+                      ? playlist[0].name || "1 track"
+                      : `${playlist.length} tracks`}
                 </span>
               </div>
               <div className="flex justify-between text-[10px] font-mono text-zinc-500 uppercase">
                 <span>Source</span>
-                <span className={hasSourcePath ? "text-zinc-300" : "text-amber-300"}>
-                  {hasSourcePath ? "Linked" : "Needs_File"}
+                <span className={allTracksHaveSource ? "text-zinc-300" : "text-amber-300"}>
+                  {playlist.length === 0
+                    ? "—"
+                    : allTracksHaveSource
+                      ? "All_Linked"
+                      : `${tracksWithSource.length}/${playlist.length} Linked`}
                 </span>
               </div>
             </div>

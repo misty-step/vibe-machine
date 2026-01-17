@@ -19,13 +19,7 @@
  * - progress=100% -> auto-reset to Idle after 3s
  */
 
-import {
-  isTauri,
-  normalizeFilePath,
-  tauriDialogs,
-  tauriInvoke,
-  tauriListen,
-} from "../platform/tauriEnv";
+import { isTauri, tauriDialogs, tauriInvoke, tauriListen } from "../platform/tauriEnv";
 import { useVibeStore } from "../store/vibeStore";
 import { AspectRatio, VibeSettings } from "../types";
 import { renderTextOverlay } from "./renderTextOverlay";
@@ -108,8 +102,6 @@ export function createExportController(): ExportController {
         isExporting,
         settings,
         playlist,
-        currentTrackId,
-        updateTrackInfo,
         backgroundImagePath,
       } = useVibeStore.getState();
 
@@ -130,15 +122,34 @@ export function createExportController(): ExportController {
         return;
       }
 
-      const currentTrack = playlist.find((t) => t.id === currentTrackId) ?? playlist[0] ?? null;
+      // Validate all tracks have source paths (define errors out of existence)
+      const tracksWithPaths = playlist.filter((t) => Boolean(t.sourcePath));
+      const missingCount = playlist.length - tracksWithPaths.length;
+
+      if (missingCount > 0) {
+        setExportState(
+          false,
+          0,
+          `${missingCount} track${missingCount > 1 ? "s" : ""} missing source file${missingCount > 1 ? "s" : ""}`
+        );
+        return;
+      }
+
+      // All tracks validated - extract paths (type narrowing via filter above)
+      const audioPaths = playlist.map((t) => t.sourcePath as string);
+      const firstTrack = playlist[0] ?? null;
 
       try {
         const dialogs = await tauriDialogs();
 
-        // 1. Pick output path (primary intent)
+        // 1. Pick output path
         const outputPathRaw = await dialogs.save({
           filters: [{ name: "Video", extensions: ["mp4"] }],
-          defaultPath: currentTrack?.name ? `${currentTrack.name}.mp4` : undefined,
+          defaultPath: firstTrack?.name
+            ? playlist.length > 1
+              ? `${firstTrack.name} (+${playlist.length - 1}).mp4`
+              : `${firstTrack.name}.mp4`
+            : undefined,
         });
 
         if (!outputPathRaw) {
@@ -147,42 +158,23 @@ export function createExportController(): ExportController {
 
         const outputPath = /\.mp4$/i.test(outputPathRaw) ? outputPathRaw : `${outputPathRaw}.mp4`;
 
-        // 2. Resolve audio source path
-        let audioPath = currentTrack?.sourcePath;
-
-        if (!audioPath) {
-          setExportState(false, 0, "Select source audio for export");
-          const pickedRaw = await dialogs.open({
-            filters: [
-              {
-                name: "Audio",
-                extensions: ["mp3", "wav", "flac", "m4a", "aac", "ogg"],
-              },
-            ],
-            multiple: false,
-          });
-
-          if (!pickedRaw || Array.isArray(pickedRaw)) {
-            return; // Cancelled - no state change
-          }
-
-          audioPath = normalizeFilePath(pickedRaw);
-          if (currentTrack?.id) {
-            updateTrackInfo(currentTrack.id, "sourcePath", audioPath);
-          }
-        }
-
-        // 3. Start export (new session prevents stale timeout race)
+        // 2. Start export (new session prevents stale timeout race)
         startExportSession();
-        setExportState(true, 0, "Initializing Native Forge...");
+        setExportState(
+          true,
+          0,
+          audioPaths.length > 1
+            ? `Initializing ${audioPaths.length} tracks...`
+            : "Initializing Native Forge..."
+        );
 
         const { width, height } = getResolution(settings.aspectRatio);
-        const textOverlay = await renderTextOverlay(settings, currentTrack, width, height);
+        const textOverlay = await renderTextOverlay(settings, firstTrack, width, height);
         const invoke = await tauriInvoke();
 
         await invoke("export_video", {
           params: {
-            audio_path: audioPath,
+            audio_paths: audioPaths,
             image_path: backgroundImagePath ?? "",
             output_path: outputPath,
             settings: mapSettingsToRust(settings),
