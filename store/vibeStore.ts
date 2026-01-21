@@ -19,6 +19,7 @@ interface VibeState {
   addTracks: (tracks: Track[]) => void;
   removeTrack: (id: string) => void;
   updateTrackInfo: (id: string, field: keyof Track, value: string) => void;
+  reorderTracks: (fromIndex: number, toIndex: number) => void;
   selectTrack: (id: string | null) => void;
   selectNextTrack: () => void;
   selectPrevTrack: () => void;
@@ -102,6 +103,18 @@ export const useVibeStore = create<VibeState>()(
       set((state) => ({
         playlist: state.playlist.map((t) => (t.id === id ? { ...t, [field]: value } : t)),
       })),
+    reorderTracks: (fromIndex, toIndex) =>
+      set((state) => {
+        if (fromIndex === toIndex) return state;
+        if (fromIndex < 0 || toIndex < 0) return state;
+        if (fromIndex >= state.playlist.length || toIndex >= state.playlist.length) return state;
+
+        const playlist = [...state.playlist];
+        const [moved] = playlist.splice(fromIndex, 1);
+        if (!moved) return state;
+        playlist.splice(toIndex, 0, moved);
+        return { playlist };
+      }),
     selectTrack: (id) => set({ currentTrackId: id }),
     selectNextTrack: () => {
       const { playlist, currentTrackId } = get();
