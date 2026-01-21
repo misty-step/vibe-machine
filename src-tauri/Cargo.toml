@@ -28,7 +28,7 @@ anyhow = "1.0"
 tokio = { version = "1", features = ["full"] }
 spectrum-analyzer = "1.5"
 symphonia = { version = "0.5", features = ["all"] }
-image = "0.24" # For debug saving if needed, or pixel conversions
+image = "0.25" # For debug saving if needed, or pixel conversions
 tauri-plugin-shell = "2.3.3"
 tauri-plugin-store = "2.4.1"
 tauri-plugin-dialog = "2"
