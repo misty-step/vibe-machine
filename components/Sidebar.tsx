@@ -257,7 +257,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
-                  Source_Video
+                  Background Image
                 </h3>
                 <div className="w-1 h-1 bg-flux rounded-full shadow-[0_0_5px_var(--tw-shadow-color)] shadow-flux"></div>
               </div>
@@ -307,7 +307,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
-                  Source_Audio
+                  Audio Tracks
                 </h3>
                 <span className="text-[9px] text-zinc-600 font-mono">
                   {playlist.length.toString().padStart(2, "0")} FILES
@@ -362,7 +362,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 )}
                 {playlist.length === 0 && (
                   <div className="p-4 text-center text-[10px] text-zinc-700 font-mono uppercase">
-                    // NO_DATA
+                    No tracks added
                   </div>
                 )}
               </div>
@@ -378,13 +378,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
               className="btn-mechanical w-full py-3 flex items-center justify-center gap-2 text-plasma border-plasma/20 hover:bg-plasma/10"
             >
               <Icons.Disc className="w-3 h-3 animate-spin-slow" />
-              <span>Randomize_Parameters</span>
+              <span>Randomize Style</span>
             </button>
 
             {/* Grid: Format */}
             <div className="space-y-2">
               <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
-                Output_Format
+                Aspect Ratio
               </h3>
               <div className="grid grid-cols-3 gap-1">
                 {[
@@ -411,7 +411,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {/* Grid: Mode */}
             <div className="space-y-2">
               <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
-                Viz_Engine
+                Visualizer Style
               </h3>
               <div className="grid grid-cols-3 gap-1">
                 {[
@@ -438,7 +438,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {/* Color Palette (Hex Grid) */}
             <div className="space-y-2">
               <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
-                Plasma_Frequency
+                Accent Color
               </h3>
               <div className="flex flex-wrap gap-2 p-2 bg-black/20 border border-white/5 rounded-sm">
                 {PRESET_COLORS.map((color) => (
@@ -621,7 +621,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   {playlist.length === 0
                     ? "—"
                     : allTracksHaveSource
-                      ? "All_Linked"
+                      ? "All Linked"
                       : `${tracksWithSource.length}/${playlist.length} Linked`}
                 </span>
               </div>
@@ -655,10 +655,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
               className="btn-mechanical w-full py-4 text-plasma border-plasma/30 hover:bg-plasma hover:text-black disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {!isExportSupported
-                ? "Desktop_App_Required"
+                ? "Desktop App Required"
                 : isExporting
                   ? "Rendering..."
-                  : "Export_Video_.mp4"}
+                  : "Export Video (.mp4)"}
             </button>
             <div className="text-[9px] text-zinc-600 font-mono uppercase">{exportHint}</div>
           </div>
