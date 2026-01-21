@@ -30,7 +30,7 @@ spectrum-analyzer = "1.5"
 symphonia = { version = "0.5", features = ["all"] }
 image = "0.24" # For debug saving if needed, or pixel conversions
 tauri-plugin-shell = "2.3.3"
-tauri-plugin-store = "2.4.1"
+tauri-plugin-store = "2.4.2"
 tauri-plugin-dialog = "2"
 reqwest = { version = "0.12.25", features = ["blocking", "rustls-tls"] }
 zip = "4.2.0"
