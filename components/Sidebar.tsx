@@ -1,4 +1,20 @@
-import React, { useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
+import {
+  closestCenter,
+  DndContext,
+  DragEndEvent,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Icons } from "./Icons";
 import {
   Track,
@@ -34,8 +50,101 @@ interface SidebarProps {
   onRemoveTrack: (id: string) => void;
   onUpdateTrackInfo: (id: string, field: keyof Track, value: string) => void;
   onSelectTrack: (index: number) => void;
+  onReorderTracks: (fromIndex: number, toIndex: number) => void;
   onExport: () => void;
 }
+
+type SidebarTab = "media" | "style" | "export";
+
+interface SortableTrackRowProps {
+  track: Track;
+  index: number;
+  isActive: boolean;
+  isPlaying: boolean;
+  onSelectTrack: (index: number) => void;
+  onRemoveTrack: (id: string) => void;
+  onUpdateTrackInfo: (id: string, field: keyof Track, value: string) => void;
+}
+
+const SortableTrackRow: React.FC<SortableTrackRowProps> = ({
+  track,
+  index,
+  isActive,
+  isPlaying,
+  onSelectTrack,
+  onRemoveTrack,
+  onUpdateTrackInfo,
+}) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: track.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center p-2 gap-2 group transition-colors ${
+        isActive
+          ? "bg-white/5 border-l-2 border-plasma"
+          : "hover:bg-white/5 border-l-2 border-transparent"
+      } ${isDragging ? "opacity-60" : ""}`}
+    >
+      <button
+        type="button"
+        ref={setActivatorNodeRef}
+        {...attributes}
+        {...listeners}
+        className="text-zinc-700 hover:text-plasma transition-colors cursor-grab active:cursor-grabbing"
+        aria-label={`Reorder ${track.name || "track"}`}
+        style={{ touchAction: "none" }}
+      >
+        <Icons.DragHandle className="w-3 h-3" />
+      </button>
+
+      <button
+        type="button"
+        onClick={() => onSelectTrack(index)}
+        className={`text-[10px] font-mono ${isActive && isPlaying ? "text-plasma animate-pulse" : "text-zinc-600 group-hover:text-zinc-400"}`}
+      >
+        {(index + 1).toString().padStart(2, "0")}
+      </button>
+
+      <div className="flex-1 min-w-0 flex flex-col">
+        <input
+          value={track.name}
+          onChange={(e) => onUpdateTrackInfo(track.id, "name", e.target.value)}
+          className={`bg-transparent text-[11px] font-medium w-full focus:outline-none placeholder-zinc-700 truncate ${isActive ? "text-white" : "text-zinc-500 group-hover:text-zinc-300"}`}
+          placeholder="Track Title"
+        />
+        <input
+          value={track.artist}
+          onChange={(e) => onUpdateTrackInfo(track.id, "artist", e.target.value)}
+          className="bg-transparent text-[9px] font-mono w-full focus:outline-none text-zinc-600 group-hover:text-zinc-300 placeholder-zinc-700 truncate"
+          placeholder="Artist"
+        />
+      </div>
+
+      <button
+        type="button"
+        onClick={() => onRemoveTrack(track.id)}
+        className="text-zinc-700 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+      >
+        <Icons.Trash className="w-3 h-3" />
+      </button>
+    </div>
+  );
+};
 
 export const Sidebar: React.FC<SidebarProps> = ({
   isCinemaMode,
@@ -56,9 +165,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onRemoveTrack,
   onUpdateTrackInfo,
   onSelectTrack,
+  onReorderTracks,
   onExport,
 }) => {
-  const [activeTab, setActiveTab] = useState<"media" | "style" | "export">("media");
+  const [activeTab, setActiveTab] = useState<SidebarTab>("media");
   const hasTrack = playlist.length > 0;
   const tracksWithSource = playlist.filter((t) => Boolean(t.sourcePath));
   const allTracksHaveSource = tracksWithSource.length === playlist.length && playlist.length > 0;
@@ -71,6 +181,40 @@ export const Sidebar: React.FC<SidebarProps> = ({
       : allTracksHaveSource
         ? "Choose save location"
         : `${playlist.length - tracksWithSource.length} track(s) need source files`;
+
+  const tabs: SidebarTab[] = ["media", "style", "export"];
+  const overlayToggles: Array<{ label: string; key: keyof VibeSettings }> = [
+    { label: "Track Title", key: "showTitle" },
+    { label: "Progress Bar", key: "showProgress" },
+    { label: "Ken Burns", key: "kenBurns" },
+    { label: "Darken BG", key: "blurBackground" },
+  ];
+
+  const trackIds = useMemo(() => playlist.map((track) => track.id), [playlist]);
+  const dragOrderRef = useRef<string[]>([]);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const handleDragStart = () => {
+    dragOrderRef.current = trackIds;
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const order = dragOrderRef.current.length > 0 ? dragOrderRef.current : trackIds;
+    dragOrderRef.current = [];
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const fromIndex = order.indexOf(String(active.id));
+    const toIndex = order.indexOf(String(over.id));
+    if (fromIndex === -1 || toIndex === -1) return;
+    onReorderTracks(fromIndex, toIndex);
+  };
+
+  const handleDragCancel = () => {
+    dragOrderRef.current = [];
+  };
 
   const randomizeVibe = () => {
     const randomColor = PRESET_COLORS[Math.floor(Math.random() * PRESET_COLORS.length)];
@@ -90,10 +234,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
     >
       {/* Deck Header / Mode Switch */}
       <div className="grid grid-cols-3 border-b border-white/5 p-1 gap-1 bg-black/20">
-        {["media", "style", "export"].map((tab) => (
+        {tabs.map((tab) => (
           <button
             key={tab}
-            onClick={() => setActiveTab(tab as any)}
+            onClick={() => setActiveTab(tab)}
             className={`py-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded-sm ${
               activeTab === tab
                 ? "bg-white/10 text-plasma shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]"
@@ -192,45 +336,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
               {/* Playlist (Data List) */}
               <div className="space-y-px bg-black/20 border border-white/5 rounded-sm overflow-hidden">
-                {playlist.map((track, idx) => (
-                  <div
-                    key={track.id}
-                    className={`flex items-center p-2 gap-3 group transition-colors ${
-                      currentTrackIndex === idx
-                        ? "bg-white/5 border-l-2 border-plasma"
-                        : "hover:bg-white/5 border-l-2 border-transparent"
-                    }`}
+                {playlist.length > 0 && (
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragStart={handleDragStart}
+                    onDragEnd={handleDragEnd}
+                    onDragCancel={handleDragCancel}
                   >
-                    <button
-                      onClick={() => onSelectTrack(idx)}
-                      className={`text-[10px] font-mono ${currentTrackIndex === idx && isPlaying ? "text-plasma animate-pulse" : "text-zinc-600 group-hover:text-zinc-400"}`}
-                    >
-                      {(idx + 1).toString().padStart(2, "0")}
-                    </button>
-
-                    <div className="flex-1 min-w-0 flex flex-col">
-                      <input
-                        value={track.name}
-                        onChange={(e) => onUpdateTrackInfo(track.id, "name", e.target.value)}
-                        className={`bg-transparent text-[11px] font-medium w-full focus:outline-none placeholder-zinc-700 truncate ${currentTrackIndex === idx ? "text-white" : "text-zinc-500 group-hover:text-zinc-300"}`}
-                        placeholder="Track Title"
-                      />
-                      <input
-                        value={track.artist}
-                        onChange={(e) => onUpdateTrackInfo(track.id, "artist", e.target.value)}
-                        className="bg-transparent text-[9px] font-mono w-full focus:outline-none text-zinc-600 group-hover:text-zinc-300 placeholder-zinc-700 truncate"
-                        placeholder="Artist"
-                      />
-                    </div>
-
-                    <button
-                      onClick={() => onRemoveTrack(track.id)}
-                      className="text-zinc-700 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <Icons.Trash className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
+                    <SortableContext items={trackIds} strategy={verticalListSortingStrategy}>
+                      {playlist.map((track, idx) => (
+                        <SortableTrackRow
+                          key={track.id}
+                          track={track}
+                          index={idx}
+                          isActive={currentTrackIndex === idx}
+                          isPlaying={isPlaying}
+                          onSelectTrack={onSelectTrack}
+                          onRemoveTrack={onRemoveTrack}
+                          onUpdateTrackInfo={onUpdateTrackInfo}
+                        />
+                      ))}
+                    </SortableContext>
+                  </DndContext>
+                )}
                 {playlist.length === 0 && (
                   <div className="p-4 text-center text-[10px] text-zinc-700 font-mono uppercase">
                     // NO_DATA
@@ -390,12 +519,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </h3>
 
               <div className="grid grid-cols-1 gap-px bg-white/5 border border-white/5 rounded-sm overflow-hidden">
-                {[
-                  { label: "Track Title", key: "showTitle" },
-                  { label: "Progress Bar", key: "showProgress" },
-                  { label: "Ken Burns", key: "kenBurns" },
-                  { label: "Darken BG", key: "blurBackground" },
-                ].map((item) => (
+                {overlayToggles.map((item) => (
                   <label
                     key={item.key}
                     className="flex items-center justify-between p-3 bg-black/20 hover:bg-white/5 cursor-pointer group transition-colors"
@@ -406,7 +530,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <div className="relative">
                       <input
                         type="checkbox"
-                        checked={(settings as any)[item.key]}
+                        checked={settings[item.key]}
                         onChange={(e) =>
                           setSettings((s) => ({ ...s, [item.key]: e.target.checked }))
                         }
