@@ -257,7 +257,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
-                  Source_Video
+                  Background Image
                 </h3>
                 <div className="w-1 h-1 bg-flux rounded-full shadow-[0_0_5px_var(--tw-shadow-color)] shadow-flux"></div>
               </div>
@@ -362,7 +362,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 )}
                 {playlist.length === 0 && (
                   <div className="p-4 text-center text-[10px] text-zinc-700 font-mono uppercase">
-                    // NO_DATA
+                    No tracks added
                   </div>
                 )}
               </div>
@@ -411,7 +411,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {/* Grid: Mode */}
             <div className="space-y-2">
               <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
-                Viz_Engine
+                Visualizer Style
               </h3>
               <div className="grid grid-cols-3 gap-1">
                 {[
@@ -438,7 +438,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {/* Color Palette (Hex Grid) */}
             <div className="space-y-2">
               <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
-                Plasma_Frequency
+                Accent Color
               </h3>
               <div className="flex flex-wrap gap-2 p-2 bg-black/20 border border-white/5 rounded-sm">
                 {PRESET_COLORS.map((color) => (
