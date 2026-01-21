@@ -200,6 +200,7 @@ const App: React.FC = () => {
           onRemoveTrack={engine.removeTrack}
           onUpdateTrackInfo={engine.updateTrackInfo}
           onSelectTrack={engine.selectTrack}
+          onReorderTracks={engine.reorderTracks}
           onExport={handleExport}
         />
 
