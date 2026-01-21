@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.0](https://github.com/misty-step/vibe-machine/compare/v1.3.2...v1.4.0) (2026-01-21)
+
+
+### Features
+
+* **app:** add Vibe Machine icon and bundle name ([#79](https://github.com/misty-step/vibe-machine/issues/79)) ([5a969c9](https://github.com/misty-step/vibe-machine/commit/5a969c90b7ad8ad971584da7bbe7a986ac429a34))
+* **ui:** drag-to-reorder playlist tracks ([#78](https://github.com/misty-step/vibe-machine/issues/78)) ([900f2d9](https://github.com/misty-step/vibe-machine/commit/900f2d940bbf8126d64e4eadc3b1db0b84613e27))
+
 ## [1.3.2](https://github.com/misty-step/vibe-machine/compare/v1.3.1...v1.3.2) (2026-01-17)
 
 
