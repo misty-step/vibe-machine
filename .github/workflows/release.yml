@@ -147,7 +147,7 @@ jobs:
           fetch-depth: 0
 
       - name: Run Landmark
-        uses: misty-step/landfall@v1
+        uses: misty-step/landmark@v1
         with:
           mode: synthesis-only
           healthcheck: 'true'
