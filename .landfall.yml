@@ -1,0 +1,17 @@
+product:
+  name: Vibe Machine
+  description: Cinematic audio visualizer forge with lo-fi aesthetics and hi-fi physics.
+audience: end-user
+voice: Visual, concrete, and focused on creative workflow improvements.
+changelog:
+  source: release-body
+artifacts:
+  markdown: docs/releases/{version}.md
+  plaintext: docs/releases/{version}.txt
+  html: docs/releases/{version}.html
+  json: docs/releases/releases.json
+  rss: docs/releases/feed.xml
+release:
+  profile: synthesis-only
+model:
+  policy: balanced

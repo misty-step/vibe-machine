@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  issues: write
   pull-requests: write
 
 jobs:
@@ -130,3 +131,27 @@ jobs:
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           echo "brew upgrade --cask vibe-machine" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+  synthesize:
+    name: Synthesize Release Notes with Landmark
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Landmark
+        uses: misty-step/landfall@v1
+        with:
+          mode: synthesis-only
+          healthcheck: 'true'
+          release-tag: ${{ needs.release-please.outputs.tag_name }}
+          github-token: ${{ secrets.GH_RELEASE_TOKEN }}
+          llm-api-key: ${{ secrets.OPENROUTER_API_KEY }}
+          changelog-source: release-body
