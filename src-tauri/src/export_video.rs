@@ -287,7 +287,7 @@ pub async fn export_video(app: tauri::AppHandle, params: ExportParams) -> Result
         track_boundaries
             .iter()
             .position(|&boundary| time_secs < boundary)
-            .unwrap_or(track_boundaries.len().saturating_sub(1).max(0))
+            .unwrap_or(track_boundaries.len().saturating_sub(1))
     };
 
     for i in 0..total_frames {
