@@ -8,6 +8,8 @@
       name="description"
       content="Cinematic audio visualization for macOS. Your music, rendered."
     />
+    <link rel="canonical" href="https://vibe-machine-fz976.ondigitalocean.app/" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <script type="module" src="/canary-observer.js"></script>
     <style>
       @import url("https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap");
@@ -332,7 +334,12 @@
 
       <div class="install">
         <code>brew install misty-step/tap/vibe-machine</code>
-        <button class="copy-btn" onclick="copyCommand(this)">
+        <button
+          class="copy-btn"
+          type="button"
+          aria-label="Copy install command"
+          onclick="copyCommand(this)"
+        >
           <svg
             class="icon-copy"
             viewBox="0 0 24 24"
