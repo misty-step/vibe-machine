@@ -113,10 +113,15 @@ describe("site Canary API", () => {
       },
       () => {
         const config = run(configHandler);
+        const health = run(healthHandler);
 
         expect(config.body).toMatchObject({
           service: "vibe-machine",
           apiKey: null,
+        });
+        expect(health.body).toMatchObject({
+          status: "degraded",
+          checks: { canaryBrowser: "missing" },
         });
       }
     );
