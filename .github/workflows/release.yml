@@ -84,47 +84,28 @@ jobs:
           prerelease: false
           args: --target aarch64-apple-darwin
 
-      - name: Upload to Vercel Blob
+      - name: Publish stable latest alias
         env:
-          BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          if [ -z "$BLOB_READ_WRITE_TOKEN" ]; then
-            echo "::warning::BLOB_READ_WRITE_TOKEN not set, skipping upload"
-            exit 0
-          fi
-
-          DMG=$(find src-tauri/target -path "*/bundle/dmg/*.dmg" | head -1)
-          if [ -z "$DMG" ]; then
-            echo "::error::No DMG found in bundle path"
+          dmg_count=$(find src-tauri/target -path "*/bundle/dmg/*.dmg" | wc -l | tr -d ' ')
+          if [ "$dmg_count" -ne 1 ]; then
+            echo "::error::Expected exactly one DMG, found $dmg_count"
             exit 1
           fi
 
-          echo "Uploading $DMG..."
-          node scripts/upload-release.mjs "$DMG" "${{ env.RELEASE_TAG }}"
-
-      - name: Update Homebrew Tap
-        env:
-          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-        run: |
-          if [ -z "$HOMEBREW_TAP_TOKEN" ]; then
-            echo "::warning::HOMEBREW_TAP_TOKEN not set, skipping Homebrew update"
-            exit 0
-          fi
-
-          DMG=$(find src-tauri/target -path "*/bundle/dmg/*.dmg" | head -1)
-          SHA256=$(shasum -a 256 "$DMG" | awk '{print $1}')
-          VERSION="${RELEASE_TAG#v}"
-
-          echo "Updating Homebrew cask to $VERSION with SHA256 $SHA256"
-          ./scripts/update-homebrew-cask.sh "$VERSION" "$SHA256" "$HOMEBREW_TAP_TOKEN"
+          dmg=$(find src-tauri/target -path "*/bundle/dmg/*.dmg" -print -quit)
+          cp "$dmg" /tmp/vibe-machine-latest.dmg
+          gh release upload "$RELEASE_TAG" /tmp/vibe-machine-latest.dmg --clobber
 
       - name: Summary
         run: |
           echo "## Release ${{ env.RELEASE_TAG }} Published! 🎉" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ DMG built and attached to GitHub release" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Uploaded to Vercel Blob for Homebrew" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Homebrew cask updated" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Stable latest-download alias refreshed" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ GitHub Releases is the canonical download origin" >> $GITHUB_STEP_SUMMARY
+          echo "- ℹ️ The Homebrew tap syncs independently from the latest GitHub release" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Users can update via:" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
