@@ -46,6 +46,14 @@ pnpm build:wasm         # Rebuild WASM after Rust changes
 pnpm tauri build        # Package .app/.exe
 ```
 
+## Releases
+
+GitHub Releases is the canonical origin for signed release metadata and macOS
+DMGs. The `misty-step/tap` Homebrew cask follows the latest published GitHub
+release. Automation also refreshes `vibe-machine-latest.dmg` on the latest
+GitHub release for consumers that need a stable URL; release artifacts are not
+mirrored to another public object store.
+
 ## License
 
 MIT
