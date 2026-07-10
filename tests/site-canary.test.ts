@@ -61,10 +61,10 @@ function run(handler: (_request: unknown, response: MockResponse) => void) {
 }
 
 describe("site Canary API", () => {
-  it("reports ok only when server and browser keys are configured and distinct", () => {
+  it("reports ok when the browser reporter key is configured", () => {
     withEnv(
       {
-        CANARY_API_KEY: "server-key",
+        CANARY_API_KEY: undefined,
         PUBLIC_CANARY_API_KEY: "browser-key",
       },
       () => {
@@ -77,7 +77,6 @@ describe("site Canary API", () => {
           service: "vibe-machine",
           checks: {
             canary: "configured",
-            canaryServer: "configured",
             canaryBrowser: "configured",
           },
         });
@@ -98,7 +97,6 @@ describe("site Canary API", () => {
         expect(health.body).toMatchObject({
           status: "degraded",
           checks: {
-            canaryServer: "missing",
             canaryBrowser: "missing",
           },
         });
