@@ -2,7 +2,7 @@
 
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
-import { dirname, extname, join } from "node:path";
+import { dirname, extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import canaryConfig from "./api/canary-config.js";
@@ -35,14 +35,17 @@ function apiResponse(response) {
 }
 
 async function serveFile(response, relativePath, headOnly) {
-  const segments = relativePath.split("/");
-  if (segments.some((segment) => segment === "..") || segments[0] === "api") {
+  const candidate = resolve(SITE_ROOT, relativePath);
+  if (
+    relativePath.startsWith("api/") ||
+    (candidate !== SITE_ROOT && !candidate.startsWith(`${SITE_ROOT}${sep}`))
+  ) {
     response.writeHead(404).end("Not found\n");
     return;
   }
 
   try {
-    const body = await readFile(join(SITE_ROOT, ...segments));
+    const body = await readFile(candidate);
     response.setHeader(
       "Content-Type",
       CONTENT_TYPES.get(extname(relativePath)) || "application/octet-stream"
@@ -67,16 +70,27 @@ export function createSiteServer() {
 
       const { pathname } = new URL(request.url || "/", "http://localhost");
       if (pathname === "/api/canary-config") {
-        canaryConfig(request, apiResponse(response));
+        await canaryConfig(request, apiResponse(response));
         return;
       }
       if (pathname === "/api/health") {
-        health(request, apiResponse(response));
+        await health(request, apiResponse(response));
         return;
       }
 
-      const decodedPath = decodeURIComponent(pathname);
-      const relativePath = decodedPath === "/" ? "index.html" : decodedPath.replace(/^\/+/, "");
+      let decodedPath;
+      try {
+        decodedPath = decodeURIComponent(pathname);
+      } catch {
+        response.writeHead(400).end("Bad request\n");
+        return;
+      }
+      const relativePath =
+        decodedPath === "/"
+          ? "index.html"
+          : decodedPath === "/favicon.ico"
+            ? "favicon.svg"
+            : decodedPath.replace(/^\/+/, "");
       await serveFile(response, relativePath, request.method === "HEAD");
     } catch {
       response.writeHead(500).end("Internal server error\n");

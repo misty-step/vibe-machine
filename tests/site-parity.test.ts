@@ -41,9 +41,10 @@ describe("DigitalOcean site parity", () => {
   it("serves the site, favicon, and Canary API from one service", async () => {
     const baseUrl = await startServer();
 
-    const [home, favicon, config, health] = await Promise.all([
+    const [home, favicon, legacyFavicon, config, health] = await Promise.all([
       fetch(`${baseUrl}/`),
       fetch(`${baseUrl}/favicon.svg`),
+      fetch(`${baseUrl}/favicon.ico`),
       fetch(`${baseUrl}/api/canary-config`),
       fetch(`${baseUrl}/api/health`),
     ]);
@@ -52,6 +53,8 @@ describe("DigitalOcean site parity", () => {
     expect(home.headers.get("content-type")).toContain("text/html");
     expect(favicon.status).toBe(200);
     expect(favicon.headers.get("content-type")).toContain("image/svg+xml");
+    expect(legacyFavicon.status).toBe(200);
+    expect(legacyFavicon.headers.get("content-type")).toContain("image/svg+xml");
     expect(config.status).toBe(200);
     await expect(config.json()).resolves.toMatchObject({ service: "vibe-machine" });
     expect(health.status).toBe(200);
@@ -60,8 +63,12 @@ describe("DigitalOcean site parity", () => {
 
   it("does not expose arbitrary files outside the site root", async () => {
     const baseUrl = await startServer();
-    const response = await fetch(`${baseUrl}/..%2Fpackage.json`);
+    const attempts = await Promise.all([
+      fetch(`${baseUrl}/..%2Fpackage.json`),
+      fetch(`${baseUrl}/%2e%2e%2fpackage.json`),
+      fetch(`${baseUrl}/%E0%A4%A`),
+    ]);
 
-    expect(response.status).toBe(404);
+    expect(attempts.map(({ status }) => status)).toEqual([404, 404, 400]);
   });
 });
