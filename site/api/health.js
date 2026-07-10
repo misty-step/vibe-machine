@@ -8,10 +8,8 @@ function configuredValue(value) {
 export default function handler(_request, response) {
   const serverKey = configuredValue(process.env.CANARY_API_KEY);
   const browserKey = configuredValue(process.env.PUBLIC_CANARY_API_KEY);
-  const serverConfigured = serverKey !== null;
-  const browserConfigured = browserKey !== null;
-  const distinctBrowserKey = browserConfigured && browserKey !== serverKey;
-  const ok = serverConfigured && distinctBrowserKey;
+  const reporterConfigured = browserKey !== null && browserKey !== serverKey;
+  const ok = reporterConfigured;
 
   response.setHeader("Cache-Control", "no-store");
   response.status(200).json({
@@ -19,8 +17,7 @@ export default function handler(_request, response) {
     service: "vibe-machine",
     checks: {
       canary: ok ? "configured" : "missing",
-      canaryServer: serverConfigured ? "configured" : "missing",
-      canaryBrowser: distinctBrowserKey ? "configured" : "missing",
+      canaryBrowser: reporterConfigured ? "configured" : "missing",
     },
     timestamp: new Date().toISOString(),
   });
