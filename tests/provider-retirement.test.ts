@@ -4,10 +4,12 @@ import { describe, expect, it } from "vitest";
 
 const root = process.cwd();
 const activeRoots = [
+  ".vercel",
   "AGENTS.md",
   "CLAUDE.md",
   "README.md",
   "package.json",
+  "vercel.json",
   ".github/workflows",
   "site",
 ];
@@ -29,6 +31,7 @@ describe("retired Vercel authority", () => {
       .map((path) => relative(root, path));
 
     expect(manifests).toEqual([]);
+    expect(existsSync(join(root, ".vercel"))).toBe(false);
   });
 
   it("has no active runtime or deployment authority", () => {
