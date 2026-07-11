@@ -126,6 +126,24 @@ describe("site Canary API", () => {
       }
     );
   });
+
+  it("defaults to the DigitalOcean Canary endpoint without Vercel runtime state", () => {
+    withEnv(
+      {
+        CANARY_ENDPOINT: undefined,
+        PUBLIC_CANARY_ENDPOINT: undefined,
+        PUBLIC_CANARY_ENVIRONMENT: undefined,
+        VERCEL_ENV: "preview",
+      },
+      () => {
+        const config = run(configHandler);
+        expect(config.body).toMatchObject({
+          endpoint: "https://canary.mistystep.io",
+          environment: "production",
+        });
+      }
+    );
+  });
 });
 
 describe("site Canary browser observer", () => {
@@ -154,7 +172,7 @@ describe("site Canary browser observer", () => {
       { service: "vibe-machine", environment: "production" },
       { message: "script boom" },
       {
-        location: { href: "https://vibe-machine-eight.vercel.app/?token=secret" },
+        location: { href: "https://vibe-machine-fz976.ondigitalocean.app/?token=secret" },
         navigator: { userAgent: "test-agent" },
       }
     );
@@ -166,7 +184,7 @@ describe("site Canary browser observer", () => {
       message: "script boom",
     });
     expect(payload.context.page_url).toBe(
-      "https://vibe-machine-eight.vercel.app/?[redacted-query]"
+      "https://vibe-machine-fz976.ondigitalocean.app/?[redacted-query]"
     );
   });
 
@@ -174,7 +192,7 @@ describe("site Canary browser observer", () => {
     const listeners = new Map<string, (event: unknown) => Promise<void>>();
     const calls: Array<{ url: string; options: RequestInit }> = [];
     const page = {
-      location: { href: "https://vibe-machine-eight.vercel.app/" },
+      location: { href: "https://vibe-machine-fz976.ondigitalocean.app/" },
       navigator: { userAgent: "test-agent" },
       fetch: async (url: string, options: RequestInit) => {
         calls.push({ url, options });
