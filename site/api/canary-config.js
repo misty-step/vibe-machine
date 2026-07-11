@@ -18,11 +18,11 @@ export default function handler(_request, response) {
 
   response.status(200).json({
     service: "vibe-machine",
-    environment: process.env.PUBLIC_CANARY_ENVIRONMENT || process.env.VERCEL_ENV || "production",
+    environment: process.env.PUBLIC_CANARY_ENVIRONMENT || "production",
     endpoint: withoutTrailingSlash(
       process.env.PUBLIC_CANARY_ENDPOINT ||
         process.env.CANARY_ENDPOINT ||
-        "https://canary-obs.fly.dev"
+        "https://canary.mistystep.io"
     ),
     apiKey: safeBrowserKey,
   });
