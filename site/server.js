@@ -100,7 +100,8 @@ export function createSiteServer() {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const port = Number.parseInt(process.env.PORT || "8080", 10);
-  createSiteServer().listen(port, "0.0.0.0", () => {
-    console.log(`vibe-machine site listening on ${port}`);
+  const host = process.env.HOST || "0.0.0.0";
+  createSiteServer().listen(port, host, () => {
+    console.log(`vibe-machine site listening on ${host}:${port}`);
   });
 }
