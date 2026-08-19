@@ -30,7 +30,7 @@
     "@fontsource/roboto-slab": "^5.2.8",
     "@tauri-apps/api": "^2.10.1",
     "@tauri-apps/plugin-dialog": "^2.6.0",
-    "@tauri-apps/plugin-store": "^2.4.2",
+    "@tauri-apps/plugin-store": "^2.4.4",
     "lucide-react": "^0.563.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.1",
