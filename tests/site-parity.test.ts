@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { createSiteServer } from "../site/server";
 
-const CANONICAL_URL = "https://vibe-machine-fz976.ondigitalocean.app/";
+const CANONICAL_URL = "https://vibe-machine.mistystep.io/";
 const servers: ReturnType<typeof createSiteServer>[] = [];
 
 afterEach(async () => {
@@ -29,8 +29,8 @@ async function startServer() {
   return `http://127.0.0.1:${port}`;
 }
 
-describe("DigitalOcean site parity", () => {
-  it("declares the DigitalOcean deployment canonical and labels the copy control", async () => {
+describe("site parity", () => {
+  it("declares the production canonical and labels the copy control", async () => {
     const html = await readFile(new URL("../site/index.html", import.meta.url), "utf8");
 
     expect(html).toContain(`<link rel="canonical" href="${CANONICAL_URL}" />`);
