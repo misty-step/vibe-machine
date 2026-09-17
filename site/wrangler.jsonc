@@ -23,8 +23,11 @@
     "production": {
       "name": "vibe-machine-site",
       "workers_dev": false,
-      // The vibe-machine.mistystep.io custom domain route attaches here once
-      // the staging proof is accepted. This file changes no DNS by itself.
+      "routes": [
+        // Attaches vibe-machine.mistystep.io as a Worker custom domain on
+        // deploy; Cloudflare manages the proxied DNS record (copy: cantrip/site).
+        { "pattern": "vibe-machine.mistystep.io", "custom_domain": true },
+      ],
     },
   },
 }
