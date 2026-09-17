@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Wrangler local state
+.wrangler
+
 # Rust build artifacts
 **/target/
 

@@ -1,0 +1,30 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "vibe-machine-site",
+  "account_id": "b069014f6a46558ea9146fb6c4ff8f6c",
+  "compatibility_date": "2026-09-10",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "worker.js",
+  "assets": {
+    "directory": "./",
+    "binding": "ASSETS",
+    "html_handling": "none",
+    "not_found_handling": "none",
+    "run_worker_first": true,
+  },
+  "env": {
+    "staging": {
+      "name": "vibe-machine-site-staging",
+      "workers_dev": true,
+      "vars": {
+        "PUBLIC_CANARY_ENVIRONMENT": "staging",
+      },
+    },
+    "production": {
+      "name": "vibe-machine-site",
+      "workers_dev": false,
+      // The vibe-machine.mistystep.io custom domain route attaches here once
+      // the staging proof is accepted. This file changes no DNS by itself.
+    },
+  },
+}
