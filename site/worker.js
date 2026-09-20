@@ -2,6 +2,7 @@
 
 import canaryConfig from "./api/canary-config.js";
 import health from "./api/health.js";
+import sentryConfig from "./api/sentry-config.js";
 
 /**
  * Cloudflare Worker for the Vibe Machine landing site.
@@ -9,8 +10,10 @@ import health from "./api/health.js";
  * site/server.js owns the routing contract; this worker mirrors it for the
  * Workers runtime so both hosts behave the same:
  *
- *   - "/api/health" and "/api/canary-config" run the same handlers as the
+ *   - "/api/health" and "/api/sentry-config" run the same handlers as the
  *     Node server, reading configuration from process.env (nodejs_compat),
+ *   - "/api/canary-config" is a 410 tombstone for the retired observer
+ *     config route; every method answers 410 without reading a body,
  *   - "/" serves index.html and "/favicon.ico" serves favicon.svg,
  *   - every other path resolves under the site root, exactly as requested,
  *   - source files and the api/ directory are never served; see also
@@ -70,7 +73,18 @@ class JsonResponder {
     return this;
   }
 
+  end() {
+    this.ended = true;
+    return this;
+  }
+
   toResponse() {
+    if (this.payload === undefined) {
+      return new Response(null, {
+        status: this.statusCode,
+        headers: this.headers,
+      });
+    }
     this.headers.set("Content-Type", "application/json; charset=utf-8");
     return new Response(JSON.stringify(this.payload), {
       status: this.statusCode,
@@ -107,15 +121,22 @@ async function serveAsset(request, env, relativePath) {
 }
 
 async function handleRequest(request, env) {
-  if (request.method !== "GET" && request.method !== "HEAD") return methodNotAllowed();
-
   const { pathname } = new URL(request.url);
 
-  if (pathname === "/api/canary-config" || pathname === "/api/health") {
+  // Tombstone first: every method answers 410, even non-GET/HEAD.
+  if (pathname === "/api/canary-config") {
+    const responder = new JsonResponder();
+    await canaryConfig(request, responder);
+    return responder.toResponse();
+  }
+
+  if (request.method !== "GET" && request.method !== "HEAD") return methodNotAllowed();
+
+  if (pathname === "/api/health" || pathname === "/api/sentry-config") {
     const responder = new JsonResponder();
     await (pathname === "/api/health"
       ? health(request, responder)
-      : canaryConfig(request, responder));
+      : sentryConfig(request, responder));
     return responder.toResponse();
   }
 

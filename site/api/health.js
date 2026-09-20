@@ -1,24 +1,43 @@
-/* global process */
+const DEFAULT_SERVICE = "vibe-machine";
 
-function configuredValue(value) {
-  const trimmed = typeof value === "string" ? value.trim() : "";
-  return trimmed.length > 0 ? trimmed : null;
-}
+/**
+ * Liveness check for the Vibe Machine landing site.
+ *
+ * Truthful and telemetry-independent: `status` reports site liveness only,
+ * never error-delivery health. The retired Canary slot stays named so old
+ * consumers can read a definitive state instead of a missing field.
+ * Browser error monitoring now runs through Sentry (see
+ * site/api/sentry-config.js and site/sentry.js) and is deliberately not
+ * reported here as a readiness requirement.
+ */
+export default function handler(request, response) {
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    response.setHeader("Allow", "GET, HEAD");
+    response.status(405).json({ status: "error", error: "Method not allowed" });
+    return;
+  }
 
-export default function handler(_request, response) {
-  const serverKey = configuredValue(process.env.CANARY_API_KEY);
-  const browserKey = configuredValue(process.env.PUBLIC_CANARY_API_KEY);
-  const reporterConfigured = browserKey !== null && browserKey !== serverKey;
-  const ok = reporterConfigured;
-
-  response.setHeader("Cache-Control", "no-store");
-  response.status(200).json({
-    status: ok ? "ok" : "degraded",
-    service: "vibe-machine",
-    checks: {
-      canary: ok ? "configured" : "missing",
-      canaryBrowser: reporterConfigured ? "configured" : "missing",
-    },
+  const body = {
+    status: "ok",
     timestamp: new Date().toISOString(),
-  });
+    service: DEFAULT_SERVICE,
+    checks: {
+      liveness: "ok",
+    },
+    observability: {
+      canary: {
+        status: "retired",
+      },
+    },
+  };
+
+  response.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+  response.status(200);
+
+  if (request.method === "HEAD") {
+    response.end();
+    return;
+  }
+
+  response.json(body);
 }

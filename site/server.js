@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 
 import canaryConfig from "./api/canary-config.js";
 import health from "./api/health.js";
+import sentryConfig from "./api/sentry-config.js";
 
 const SITE_ROOT = dirname(fileURLToPath(import.meta.url));
 const CONTENT_TYPES = new Map([
@@ -29,6 +30,10 @@ function apiResponse(response) {
     json(payload) {
       response.setHeader("Content-Type", "application/json; charset=utf-8");
       response.end(JSON.stringify(payload));
+      return this;
+    },
+    end() {
+      response.end();
       return this;
     },
   };
@@ -62,19 +67,24 @@ async function serveFile(response, relativePath, headOnly) {
 export function createSiteServer() {
   return createServer(async (request, response) => {
     try {
+      const { pathname } = new URL(request.url || "/", "http://localhost");
+
+      // Tombstone first: every method answers 410, even non-GET/HEAD.
+      if (pathname === "/api/canary-config") {
+        await canaryConfig(request, apiResponse(response));
+        return;
+      }
+
       if (request.method !== "GET" && request.method !== "HEAD") {
         response.setHeader("Allow", "GET, HEAD");
         response.writeHead(405).end("Method not allowed\n");
         return;
       }
 
-      const { pathname } = new URL(request.url || "/", "http://localhost");
-      if (pathname === "/api/canary-config") {
-        await canaryConfig(request, apiResponse(response));
-        return;
-      }
-      if (pathname === "/api/health") {
-        await health(request, apiResponse(response));
+      if (pathname === "/api/health" || pathname === "/api/sentry-config") {
+        await (pathname === "/api/health"
+          ? health(request, apiResponse(response))
+          : sentryConfig(request, apiResponse(response)));
         return;
       }
 

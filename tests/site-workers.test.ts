@@ -22,7 +22,7 @@ function createEnv() {
             headers: { "Content-Type": "image/svg+xml; charset=utf-8" },
           });
         }
-        if (url.pathname === "/canary-observer.js") {
+        if (url.pathname === "/sentry.js") {
           return new Response("export {};", {
             headers: { "Content-Type": "text/javascript; charset=utf-8" },
           });
@@ -83,36 +83,68 @@ describe("site Workers routing", () => {
     expect(response.headers.get("content-type")).toContain("image/svg+xml");
   });
 
-  it("answers /api/health with the shared handler output", async () => {
+  it("serves the sentry bootstrap as a public asset", async () => {
     const { env, requests } = createEnv();
-    const response = await withEnv(
-      { CANARY_API_KEY: undefined, PUBLIC_CANARY_API_KEY: "browser-key" },
-      () => callWorker("/api/health", {}, env)
-    );
+    const response = await callWorker("/sentry.js", {}, env);
 
     expect(response.status).toBe(200);
-    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(requests).toEqual([{ pathname: "/sentry.js", method: "GET" }]);
+    expect(response.headers.get("content-type")).toContain("javascript");
+  });
+
+  it("answers /api/health with the shared liveness-only handler output", async () => {
+    const { env, requests } = createEnv();
+    const response = await callWorker("/api/health", {}, env);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-cache, no-store, must-revalidate");
     expect(response.headers.get("content-type")).toContain("application/json");
     await expect(response.json()).resolves.toMatchObject({
       status: "ok",
       service: "vibe-machine",
-      checks: { canary: "configured", canaryBrowser: "configured" },
+      checks: { liveness: "ok" },
+      observability: { canary: { status: "retired" } },
     });
     expect(requests).toEqual([]);
   });
 
-  it("answers /api/canary-config with the shared handler output", async () => {
+  it("answers /api/sentry-config with injectable config", async () => {
     const { env } = createEnv();
-    const response = await withEnv(
-      { CANARY_API_KEY: undefined, PUBLIC_CANARY_API_KEY: "browser-key" },
-      () => callWorker("/api/canary-config", {}, env)
-    );
 
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
+    const disabled = await withEnv({ SENTRY_DSN: undefined, NODE_ENV: undefined }, () =>
+      callWorker("/api/sentry-config", {}, env)
+    );
+    expect(disabled.status).toBe(200);
+    await expect(disabled.json()).resolves.toMatchObject({
+      enabled: false,
       service: "vibe-machine",
-      apiKey: "browser-key",
     });
+
+    const enabled = await withEnv({ SENTRY_DSN: "https://public@example.invalid/1" }, () =>
+      callWorker("/api/sentry-config", {}, env)
+    );
+    expect(enabled.status).toBe(200);
+    await expect(enabled.json()).resolves.toMatchObject({
+      enabled: true,
+      dsn: "https://public@example.invalid/1",
+    });
+  });
+
+  it("keeps the legacy observer config route as a 410 tombstone for every method", async () => {
+    const { env, requests } = createEnv();
+
+    for (const method of ["GET", "POST", "DELETE"]) {
+      const response = await callWorker("/api/canary-config", { method }, env);
+      expect(response.status, method).toBe(410);
+      expect(response.headers.get("cache-control")).toBe("no-store");
+      expect(response.headers.get("access-control-allow-origin")).toBeNull();
+      await expect(response.json()).resolves.toEqual({ status: "retired", service: "canary" });
+    }
+
+    const head = await callWorker("/api/canary-config", { method: "HEAD" }, env);
+    expect(head.status).toBe(410);
+    expect(await head.text()).toBe("");
+    expect(requests).toEqual([]);
   });
 
   it("never serves source files or api modules", async () => {
@@ -120,6 +152,7 @@ describe("site Workers routing", () => {
     for (const path of [
       "/server.js",
       "/api/health.js",
+      "/api/sentry-config.js",
       "/api/canary-config.js",
       "/worker.js",
       "/wrangler.jsonc",
