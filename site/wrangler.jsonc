@@ -17,12 +17,16 @@
       "name": "vibe-machine-site-staging",
       "workers_dev": true,
       "vars": {
-        "PUBLIC_CANARY_ENVIRONMENT": "staging",
+        // Browser monitoring stays off until a deploy provides SENTRY_DSN
+        // (public DSN). SENTRY_RELEASE is optional. No DSN is committed here.
+        "SENTRY_ENVIRONMENT": "staging",
       },
     },
     "production": {
       "name": "vibe-machine-site",
       "workers_dev": false,
+      // Browser monitoring stays off until a deploy provides SENTRY_DSN
+      // (public DSN). SENTRY_RELEASE is optional. No DSN is committed here.
       "routes": [
         // Attaches vibe-machine.mistystep.io as a Worker custom domain on
         // deploy; Cloudflare manages the proxied DNS record (copy: cantrip/site).

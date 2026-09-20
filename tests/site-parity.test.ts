@@ -38,15 +38,16 @@ describe("site parity", () => {
     expect(html).toContain('aria-label="Copy install command"');
   });
 
-  it("serves the site, favicon, and Canary API from one service", async () => {
+  it("serves the site, favicon, and Sentry config from one service", async () => {
     const baseUrl = await startServer();
 
-    const [home, favicon, legacyFavicon, config, health] = await Promise.all([
+    const [home, favicon, legacyFavicon, config, health, tombstone] = await Promise.all([
       fetch(`${baseUrl}/`),
       fetch(`${baseUrl}/favicon.svg`),
       fetch(`${baseUrl}/favicon.ico`),
-      fetch(`${baseUrl}/api/canary-config`),
+      fetch(`${baseUrl}/api/sentry-config`),
       fetch(`${baseUrl}/api/health`),
+      fetch(`${baseUrl}/api/canary-config`),
     ]);
 
     expect(home.status).toBe(200);
@@ -59,6 +60,8 @@ describe("site parity", () => {
     await expect(config.json()).resolves.toMatchObject({ service: "vibe-machine" });
     expect(health.status).toBe(200);
     await expect(health.json()).resolves.toMatchObject({ service: "vibe-machine" });
+    expect(tombstone.status).toBe(410);
+    await expect(tombstone.json()).resolves.toEqual({ status: "retired", service: "canary" });
   });
 
   it("does not expose arbitrary files outside the site root", async () => {
