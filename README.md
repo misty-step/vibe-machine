@@ -54,6 +54,51 @@ release. Automation also refreshes `vibe-machine-latest.dmg` on the latest
 GitHub release for consumers that need a stable URL; release artifacts are not
 mirrored to another public object store.
 
+## Public site
+
+The public experience is the install-command landing page in `site/`, not the
+root Vite preview or Tauri application. The former DigitalOcean Node process
+ran this subproject at revision `d86e970350cb464be2b882e141b8518270e60f53`.
+Its homepage matches that source except for the canonical domain; the favicon
+and legacy observer match byte-for-byte. The existing Cloudflare landing page
+matches current `site/index.html`, `site/favicon.svg`, and `site/sentry.js`.
+The approved Sentry cutover replaces the old observer; no UI or media workflow
+is changed by moving the aliases.
+
+`site/wrangler.jsonc` owns the existing `vibe-machine-site` Worker and its three
+custom domains: `vibe-machine.mistystep.io`, `vibecheck.design`, and
+`www.vibecheck.design`. Each serves the page directly, with the same canonical
+URL, rather than redirecting visitors. Static bytes come from Workers Assets;
+the Worker runs the shared health and monitoring-config handlers locally.
+There is no app database, user upload, WebSocket, or authentication callback
+in this landing site. Browser monitoring goes directly to Sentry, not a DO
+relay. Desktop media and exports stay outside this deployment.
+
+```bash
+pnpm site:deploy --dry-run
+pnpm site:deploy --tag <full-reviewed-commit-sha>
+```
+
+Deploy only a reviewed, green revision. Authenticate through the existing
+Cloudflare native/pass broker; `--keep-vars` preserves deployed configuration
+and secrets. No private payloads or credential values belong in deploy output.
+
+The `vibecheck.design` Cloudflare zone must also be active at the registrar:
+its assigned nameservers are `elsa.ns.cloudflare.com` and
+`miles.ns.cloudflare.com`. Preserve the existing apex verification TXT record
+before changing delegation; Worker custom domains replace only the old web
+A/CNAME records. A Worker upload alone is not proof that either alias has left
+DigitalOcean. Check registry delegation, authoritative DNS, all three domains,
+asset hashes, health, and the real install-command copy interaction.
+
+For code rollback, use project-local Wrangler with the captured previous
+production version ID and `--config site/wrangler.jsonc --env production`.
+For delegation rollback, restore the captured original nameservers and DNS
+records while the old origin remains intact. Do not delete the old origin,
+provider resources, or data as part of this reversible site cutover. The parent
+`K-20261012-infrastructure-gets-simpler-seen-through` owns exact deployment,
+DNS, rollback receipts and the global PostgreSQL 16 off-DO backup gate.
+
 ## License
 
 MIT

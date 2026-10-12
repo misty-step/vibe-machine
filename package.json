@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "pnpm run build:wasm && vite build",
     "preview": "vite preview",
+    "site:deploy": "wrangler deploy --config site/wrangler.jsonc --env production --keep-vars",
     "build:wasm": "cd crates/vibe-engine && wasm-pack build --target web --out-dir ../../src/vibe-engine-wasm",
     "lint": "eslint .",
     "format": "prettier --write .",
@@ -54,7 +55,8 @@
     "vite-plugin-top-level-await": "^1.6.0",
     "vite-plugin-wasm": "^3.5.0",
     "vitest": "^4.0.15",
-    "wasm-pack": "^0.13.1"
+    "wasm-pack": "^0.13.1",
+    "wrangler": "4.135.0"
   },
   "packageManager": "pnpm@10.22.0+sha512.bf049efe995b28f527fd2b41ae0474ce29186f7edcb3bf545087bd61fbbebb2bf75362d1307fda09c2d288e1e499787ac12d4fcb617a974718a6051f2eee741c"
 }

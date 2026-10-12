@@ -1,5 +1,5 @@
 {
-  "$schema": "./node_modules/wrangler/config-schema.json",
+  "$schema": "../node_modules/wrangler/config-schema.json",
   "name": "vibe-machine-site",
   "account_id": "b069014f6a46558ea9146fb6c4ff8f6c",
   "compatibility_date": "2026-09-10",
@@ -28,9 +28,10 @@
       // Browser monitoring stays off until a deploy provides SENTRY_DSN
       // (public DSN). SENTRY_RELEASE is optional. No DSN is committed here.
       "routes": [
-        // Attaches vibe-machine.mistystep.io as a Worker custom domain on
-        // deploy; Cloudflare manages the proxied DNS record (copy: cantrip/site).
+        // All three names serve the same landing page, without redirects.
         { "pattern": "vibe-machine.mistystep.io", "custom_domain": true },
+        { "pattern": "vibecheck.design", "custom_domain": true },
+        { "pattern": "www.vibecheck.design", "custom_domain": true },
       ],
     },
   },
