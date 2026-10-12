@@ -54,6 +54,63 @@ release. Automation also refreshes `vibe-machine-latest.dmg` on the latest
 GitHub release for consumers that need a stable URL; release artifacts are not
 mirrored to another public object store.
 
+## Public site
+
+The public experience is the install-command landing page in `site/`, not the
+root Vite preview or Tauri application. The former DigitalOcean Node process
+ran this subproject at revision `d86e970350cb464be2b882e141b8518270e60f53`.
+Its homepage matches that source except for the canonical domain; the favicon
+and legacy observer match byte-for-byte. The existing Cloudflare landing page
+matches current `site/index.html`, `site/favicon.svg`, and `site/sentry.js`.
+The approved Sentry cutover replaces the old observer; no UI or media workflow
+is changed by moving the aliases.
+
+`site/wrangler.jsonc` owns the existing `vibe-machine-site` Worker: the canonical
+`vibe-machine.mistystep.io` custom domain and exact apex/www routes in the
+`vibecheck.design` zone. Each serves the page directly, with the same canonical
+URL, rather than redirecting visitors. Static bytes come from Workers Assets;
+the Worker runs the shared health and monitoring-config handlers locally.
+There is no app database, user upload, WebSocket, or authentication callback
+in this landing site. Browser monitoring goes directly to Sentry, not a DO
+relay. Desktop media and exports stay outside this deployment.
+
+```bash
+pnpm site:deploy --dry-run
+pnpm site:deploy --tag <full-reviewed-commit-sha>
+```
+
+Deploy only a reviewed, green revision, after the `vibecheck.design` zone is
+active at the registrar. Authenticate through the existing Cloudflare
+native/pass broker; `--keep-vars` preserves deployed configuration and secrets,
+including the existing Sentry release for unchanged application code. No
+private payloads or credential values belong in deploy output.
+
+Before delegation, verify registrar ownership, absence of a parent DNSSEC DS
+record, disabled Cloudflare DNSSEC, and a fresh complete DO zone inventory.
+Preserve the existing apex SPF TXT and any other non-web records. Stage
+DNS-only apex/www A records to the intact old origin while delegation to
+`elsa.ns.cloudflare.com` and `miles.ns.cloudflare.com` activates the CF zone.
+Once active, install the reviewed routes and verify active edge TLS before
+switching those same records to proxied A `192.0.2.0` (the reserved originless
+placeholder). Do not delete/recreate web records: in-place updates avoid a
+negative-cache gap. The Worker uses `ASSETS`, never an origin fetch.
+
+A Worker upload alone is not proof that either alias has left DigitalOcean.
+Check registry delegation, authoritative DNS, route bindings, TLS, all three
+domains, asset hashes, health, and the real install-command copy interaction.
+Confirm monitor consumers accept the already-approved liveness/Sentry
+contract before replacing the stale DO observer.
+
+For code rollback, use project-local Wrangler with the captured previous
+production version ID and `--config site/wrangler.jsonc --env production`.
+For a fast routing rollback, restore the recorded apex/www A records to
+DNS-only old-origin values in place; allow resolver caches to converge.
+Delegation rollback restores the captured original nameservers and DNS
+records while the old origin remains intact. Do not delete the old origin,
+provider resources, or data as part of this reversible site cutover. The parent
+`K-20261012-infrastructure-gets-simpler-seen-through` owns exact deployment,
+DNS, rollback receipts and the global PostgreSQL 16 off-DO backup gate.
+
 ## License
 
 MIT

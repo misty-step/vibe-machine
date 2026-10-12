@@ -8,6 +8,7 @@ export default tseslint.config(
     ignores: [
       "dist/**",
       "node_modules/**",
+      "**/.wrangler/**",
       "src/vibe-engine-wasm/**",
       "src-tauri/target/**",
       "crates/**/target/**",
