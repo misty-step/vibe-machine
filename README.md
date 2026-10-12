@@ -65,9 +65,9 @@ matches current `site/index.html`, `site/favicon.svg`, and `site/sentry.js`.
 The approved Sentry cutover replaces the old observer; no UI or media workflow
 is changed by moving the aliases.
 
-`site/wrangler.jsonc` owns the existing `vibe-machine-site` Worker and its three
-custom domains: `vibe-machine.mistystep.io`, `vibecheck.design`, and
-`www.vibecheck.design`. Each serves the page directly, with the same canonical
+`site/wrangler.jsonc` owns the existing `vibe-machine-site` Worker: the canonical
+`vibe-machine.mistystep.io` custom domain and exact apex/www routes in the
+`vibecheck.design` zone. Each serves the page directly, with the same canonical
 URL, rather than redirecting visitors. Static bytes come from Workers Assets;
 the Worker runs the shared health and monitoring-config handlers locally.
 There is no app database, user upload, WebSocket, or authentication callback
@@ -79,21 +79,33 @@ pnpm site:deploy --dry-run
 pnpm site:deploy --tag <full-reviewed-commit-sha>
 ```
 
-Deploy only a reviewed, green revision. Authenticate through the existing
-Cloudflare native/pass broker; `--keep-vars` preserves deployed configuration
-and secrets. No private payloads or credential values belong in deploy output.
+Deploy only a reviewed, green revision, after the `vibecheck.design` zone is
+active at the registrar. Authenticate through the existing Cloudflare
+native/pass broker; `--keep-vars` preserves deployed configuration and secrets,
+including the existing Sentry release for unchanged application code. No
+private payloads or credential values belong in deploy output.
 
-The `vibecheck.design` Cloudflare zone must also be active at the registrar:
-its assigned nameservers are `elsa.ns.cloudflare.com` and
-`miles.ns.cloudflare.com`. Preserve the existing apex verification TXT record
-before changing delegation; Worker custom domains replace only the old web
-A/CNAME records. A Worker upload alone is not proof that either alias has left
-DigitalOcean. Check registry delegation, authoritative DNS, all three domains,
-asset hashes, health, and the real install-command copy interaction.
+Before delegation, verify registrar ownership, absence of a parent DNSSEC DS
+record, disabled Cloudflare DNSSEC, and a fresh complete DO zone inventory.
+Preserve the existing apex SPF TXT and any other non-web records. Stage
+DNS-only apex/www A records to the intact old origin while delegation to
+`elsa.ns.cloudflare.com` and `miles.ns.cloudflare.com` activates the CF zone.
+Once active, install the reviewed routes and verify active edge TLS before
+switching those same records to proxied A `192.0.2.0` (the reserved originless
+placeholder). Do not delete/recreate web records: in-place updates avoid a
+negative-cache gap. The Worker uses `ASSETS`, never an origin fetch.
+
+A Worker upload alone is not proof that either alias has left DigitalOcean.
+Check registry delegation, authoritative DNS, route bindings, TLS, all three
+domains, asset hashes, health, and the real install-command copy interaction.
+Confirm monitor consumers accept the already-approved liveness/Sentry
+contract before replacing the stale DO observer.
 
 For code rollback, use project-local Wrangler with the captured previous
 production version ID and `--config site/wrangler.jsonc --env production`.
-For delegation rollback, restore the captured original nameservers and DNS
+For a fast routing rollback, restore the recorded apex/www A records to
+DNS-only old-origin values in place; allow resolver caches to converge.
+Delegation rollback restores the captured original nameservers and DNS
 records while the old origin remains intact. Do not delete the old origin,
 provider resources, or data as part of this reversible site cutover. The parent
 `K-20261012-infrastructure-gets-simpler-seen-through` owns exact deployment,

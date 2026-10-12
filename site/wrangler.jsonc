@@ -30,8 +30,8 @@
       "routes": [
         // All three names serve the same landing page, without redirects.
         { "pattern": "vibe-machine.mistystep.io", "custom_domain": true },
-        { "pattern": "vibecheck.design", "custom_domain": true },
-        { "pattern": "www.vibecheck.design", "custom_domain": true },
+        { "pattern": "vibecheck.design/*", "zone_name": "vibecheck.design" },
+        { "pattern": "www.vibecheck.design/*", "zone_name": "vibecheck.design" },
       ],
     },
   },
