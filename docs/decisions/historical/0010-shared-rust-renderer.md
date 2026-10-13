@@ -1,6 +1,6 @@
 # ADR-0001: Shared Rust Renderer for Preview and Export
 
-**Status:** Superseded by [002-shared-rust-vibe-engine](./002-shared-rust-vibe-engine.md)
+**Status:** Superseded by [002-shared-rust-vibe-engine](../002-shared-rust-vibe-engine.md)
 **Date:** 2025-12-01
 
 ## Context
