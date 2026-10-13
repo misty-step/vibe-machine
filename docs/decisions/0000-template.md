@@ -2,8 +2,8 @@
 
 - **Status:** accepted <!-- accepted | superseded by NNNN, linked to that record -->
 - **Date:** YYYY-MM-DD <!-- YYYY-MM is allowed for migrated records whose source gives only a month; do not invent a day. -->
-- **Primitives:** <ids from docs/architecture/primitives.yaml (once it exists)>
-- **Powder:** <item id, optional>
+- **Primitives:** `<ids from docs/architecture/primitives.yaml (once it exists)>`
+- **Powder:** `<item id, optional>`
 
 ## Context
 
