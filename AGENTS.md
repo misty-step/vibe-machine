@@ -47,7 +47,8 @@
 
 - One Rust core drives both preview and export. WASM for React canvas, native for FFmpeg export.
 - Tauri commands in `src-tauri/src/`. UI orchestrates audio + settings in React.
-- ADRs in `docs/adr/` explain major design decisions.
+- Open docs/decisions/index.md before proposing a new primitive, surface, or storage home.
+  See the [steering veto list](docs/decisions/index.md).
 
 ## Anti-Patterns
 
