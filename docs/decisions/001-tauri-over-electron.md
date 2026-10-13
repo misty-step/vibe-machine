@@ -2,7 +2,7 @@
 
 - **Status:** accepted
 - **Date:** 2024-12
-- **Primitives:** desktop runtime
+- **Primitives:** tauri
 - **Powder:** none recorded
 
 ## Context
