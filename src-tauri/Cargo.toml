@@ -26,7 +26,7 @@ tauri = { version = "2.9.5", features = ["protocol-asset", "macos-private-api"] 
 tauri-plugin-log = "2"
 anyhow = "1.0"
 tokio = { version = "1", features = ["full"] }
-spectrum-analyzer = "1.5"
+spectrum-analyzer = "2.0"
 symphonia = { version = "0.5", features = ["all"] }
 image = "0.25" # For debug saving if needed, or pixel conversions
 tauri-plugin-shell = "2.3.5"
