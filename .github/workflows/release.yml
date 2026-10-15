@@ -1,27 +1,67 @@
 name: Release
 
 on:
-  push:
-    branches: [master]
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
   contents: write
   pull-requests: write
+  actions: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
   release-please:
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'master' && github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
+      sha: ${{ steps.release.outputs.sha }}
     steps:
-      - uses: googleapis/release-please-action@v4
+      - uses: actions/github-script@v7
+        name: Require green CI on the current source
+        with:
+          script: |
+            const { data: branch } = await github.rest.repos.getBranch({ ...context.repo, branch: 'master' });
+            const sha = context.payload.workflow_run?.head_sha ?? context.sha;
+            if (branch.commit.sha !== sha) throw new Error('Refusing stale release source');
+            const { data } = await github.rest.actions.listWorkflowRuns({ ...context.repo, workflow_id: 'ci.yml', head_sha: sha, event: 'push', per_page: 1 });
+            if (data.workflow_runs[0]?.conclusion !== 'success') throw new Error('Current source has no successful CI');
+
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         id: release
         with:
-          release-type: node
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+  approve-release-ci:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        name: Approve native release PR CI, including delayed or unchanged runs
+        with:
+          script: |
+            const prs = await github.paginate(github.rest.pulls.list, { ...context.repo, state: 'open', base: 'master', per_page: 100 });
+            for (const pr of prs) {
+              if (pr.head.repo.full_name !== `${context.repo.owner}/${context.repo.repo}` ||
+                  !pr.head.ref.startsWith('release-please--branches--master') ||
+                  pr.user.login !== 'github-actions[bot]') continue;
+              const { data } = await github.rest.actions.listWorkflowRuns({ ...context.repo, workflow_id: 'ci.yml', event: 'pull_request', head_sha: pr.head.sha, per_page: 100 });
+              for (const run of data.workflow_runs) {
+                if (run.conclusion !== 'action_required') continue;
+                if (!run.pull_requests.some(p => p.number === pr.number)) throw new Error('Run does not belong to release PR');
+                const { data: current } = await github.rest.pulls.get({ ...context.repo, pull_number: pr.number });
+                if (current.head.sha !== run.head_sha) throw new Error('Release PR moved');
+                await github.rest.actions.approveWorkflowRun({ ...context.repo, run_id: run.id });
+              }
+            }
 
   build:
     needs: release-please
@@ -32,18 +72,21 @@ jobs:
     env:
       RELEASE_TAG: ${{ needs.release-please.outputs.tag_name }}
     steps:
-      # Checkout the specific tag to avoid race with new commits
+      - uses: actions/github-script@v7
+        name: Require green CI for the actual draft release source
+        env:
+          RELEASE_SHA: ${{ needs.release-please.outputs.sha }}
+        with:
+          script: |
+            const sha = process.env.RELEASE_SHA;
+            if (!/^[0-9a-f]{40}$/.test(sha || '')) throw new Error('Missing release source');
+            const { data } = await github.rest.actions.listWorkflowRuns({ ...context.repo, workflow_id: 'ci.yml', head_sha: sha, event: 'push', per_page: 1 });
+            if (data.workflow_runs[0]?.conclusion !== 'success') throw new Error('Actual release source has no successful CI');
+
+      # Draft tags are not public yet; build the generator's exact source SHA.
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.release-please.outputs.tag_name }}
-
-      # Sync tauri.conf.json version from tag (release-please extra-files is unreliable)
-      - name: Sync Tauri version
-        run: |
-          VERSION="${RELEASE_TAG#v}"
-          jq --arg v "$VERSION" '.version = $v' src-tauri/tauri.conf.json > tmp.json
-          mv tmp.json src-tauri/tauri.conf.json
-          echo "Set tauri.conf.json version to $VERSION"
+          ref: ${{ needs.release-please.outputs.sha }}
 
       - uses: pnpm/action-setup@v4
 
@@ -61,7 +104,7 @@ jobs:
         with:
           targets: aarch64-apple-darwin
 
-      - run: pnpm install
+      - run: pnpm install --frozen-lockfile
 
       - name: Setup FFmpeg
         run: ./scripts/setup-ffmpeg.sh
@@ -80,7 +123,7 @@ jobs:
         with:
           tagName: ${{ env.RELEASE_TAG }}
           # Don't set releaseName - preserves release-please changelog
-          releaseDraft: false
+          releaseDraft: true
           prerelease: false
           args: --target aarch64-apple-darwin
 
@@ -97,6 +140,11 @@ jobs:
           dmg=$(find src-tauri/target -path "*/bundle/dmg/*.dmg" -print -quit)
           cp "$dmg" /tmp/vibe-machine-latest.dmg
           gh release upload "$RELEASE_TAG" /tmp/vibe-machine-latest.dmg --clobber
+
+      - name: Publish the completed release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release edit "$RELEASE_TAG" --draft=false --latest
 
       - name: Summary
         run: |

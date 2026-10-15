@@ -15,6 +15,7 @@ agent will otherwise re-propose. Do not write one per PR. Start from
 - [007](007-platform-abstraction-pattern.md): isolate Tauri APIs behind runtime helpers.
 - [008](008-export-controller-deep-module.md): keep export orchestration out of React components.
 - [009](009-audio-system-singleton.md): one AudioSystem owns the audio lifecycle.
+- [0011](0011-release-authority.md): keep release-please and let Tauri read the generated application version.
 
 ## Historical
 
