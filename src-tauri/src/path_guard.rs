@@ -185,7 +185,10 @@ mod tests {
 
         let result = guard_export_paths("relative/path.mp3", output.to_str().unwrap(), "");
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("audio_path must be absolute"));
+        assert_eq!(
+            result.unwrap_err(),
+            "audio path must be absolute: relative/path.mp3"
+        );
     }
 
     #[test]

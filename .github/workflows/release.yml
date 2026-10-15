@@ -79,7 +79,7 @@ jobs:
   build:
     needs: release-please
     if: needs.release-please.outputs.release_created == 'true'
-    runs-on: macos-latest
+    runs-on: macos-15
     permissions:
       contents: write
     env:
@@ -140,6 +140,19 @@ jobs:
           prerelease: false
           args: --target aarch64-apple-darwin
 
+      - name: Exercise native install, update, rollback and bundled codecs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/smoke-macos-release.py
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: macos-release-smoke
+          path: ${{ runner.temp }}/vibe-release-smoke/evidence
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Publish stable latest alias
         env:
           GH_TOKEN: ${{ github.token }}
@@ -153,6 +166,9 @@ jobs:
           dmg=$(find src-tauri/target -path "*/bundle/dmg/*.dmg" -print -quit)
           cp "$dmg" /tmp/vibe-machine-latest.dmg
           gh release upload "$RELEASE_TAG" /tmp/vibe-machine-latest.dmg --clobber
+          shasum -a 256 "$dmg" /tmp/vibe-machine-latest.dmg > SHA256SUMS.txt
+          git rev-parse HEAD > SOURCE_REVISION.txt
+          gh release upload "$RELEASE_TAG" SHA256SUMS.txt SOURCE_REVISION.txt
 
       - name: Publish the completed release
         env:
