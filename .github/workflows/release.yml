@@ -5,6 +5,11 @@ on:
     workflows: [CI]
     types: [completed]
   workflow_dispatch:
+    inputs:
+      approve_only:
+        type: boolean
+        default: false
+        description: Approve pending native release PR CI without generating a release
 
 permissions:
   contents: write
@@ -17,7 +22,7 @@ concurrency:
 
 jobs:
   release-please:
-    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'master' && github.event.workflow_run.conclusion == 'success')
+    if: (github.event_name == 'workflow_dispatch' && !inputs.approve_only) || (github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'master' && github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
@@ -40,8 +45,15 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
+      # GITHUB_TOKEN-created approval-required runs emit no workflow_run event.
+      # A separate dispatch is native, delayed until after PR creation, and recoverable.
+      - name: Dispatch native release PR CI approval
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref master -f approve_only=true
+
   approve-release-ci:
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.event == 'pull_request'
+    if: inputs.approve_only || github.event.workflow_run.event == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/github-script@v7
@@ -54,6 +66,7 @@ jobs:
                   !pr.head.ref.startsWith('release-please--branches--master') ||
                   pr.user.login !== 'github-actions[bot]') continue;
               const { data } = await github.rest.actions.listWorkflowRuns({ ...context.repo, workflow_id: 'ci.yml', event: 'pull_request', head_sha: pr.head.sha, per_page: 100 });
+              if (!data.workflow_runs.length) throw new Error('Release PR CI has not appeared; retry this approval dispatch');
               for (const run of data.workflow_runs) {
                 if (run.conclusion !== 'action_required') continue;
                 if (!run.pull_requests.some(p => p.number === pr.number)) throw new Error('Run does not belong to release PR');
