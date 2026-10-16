@@ -10,6 +10,10 @@ on:
         type: boolean
         default: false
         description: Approve pending native release PR CI without generating a release
+      resume_tag:
+        type: string
+        default: ""
+        description: Resume an empty bot draft at the current verified source (no existing tag may move)
 
 permissions:
   contents: write
@@ -25,9 +29,9 @@ jobs:
     if: (github.event_name == 'workflow_dispatch' && !inputs.approve_only) || (github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'master' && github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
     outputs:
-      release_created: ${{ steps.release.outputs.release_created }}
-      tag_name: ${{ steps.release.outputs.tag_name }}
-      sha: ${{ steps.release.outputs.sha }}
+      release_created: ${{ steps.release.outputs.release_created || steps.resume.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name || steps.resume.outputs.tag_name }}
+      sha: ${{ steps.release.outputs.sha || steps.resume.outputs.sha }}
     steps:
       - uses: actions/github-script@v7
         name: Require green CI on the current source
@@ -41,9 +45,54 @@ jobs:
 
       - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         id: release
+        if: inputs.resume_tag == ''
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+          skip-github-pull-request: true
+
+      - uses: actions/github-script@v7
+        id: resume
+        if: inputs.resume_tag != ''
+        name: Resume only an empty unpublished bot draft
+        env:
+          RESUME_TAG: ${{ inputs.resume_tag }}
+        with:
+          script: |
+            const tag = process.env.RESUME_TAG;
+            const releases = await github.paginate(github.rest.repos.listReleases, { ...context.repo, per_page: 100 });
+            const draft = releases.find(r => r.tag_name === tag);
+            if (!draft?.draft || draft.assets.length || draft.author.login !== 'github-actions[bot]') throw new Error('Only an empty bot draft can resume');
+            const { data: file } = await github.rest.repos.getContent({ ...context.repo, path: 'package.json', ref: context.sha });
+            const pkg = JSON.parse(Buffer.from(file.content, 'base64').toString());
+            if (tag !== `v${pkg.version}`) throw new Error('Draft must match the generated source version');
+            try {
+              const { data: ref } = await github.rest.git.getRef({ ...context.repo, ref: `tags/${tag}` });
+              if (ref.object.sha !== context.sha) throw new Error('Refusing to move an immutable tag');
+            } catch (error) {
+              if (error.status !== 404) throw error;
+            }
+            await github.rest.repos.updateRelease({ ...context.repo, release_id: draft.id, target_commitish: context.sha });
+            const { data: confirmed } = await github.rest.repos.getRelease({ ...context.repo, release_id: draft.id });
+            if (!confirmed.draft || confirmed.target_commitish !== context.sha) throw new Error('Draft source readback failed');
+            core.setOutput('release_created', 'true');
+            core.setOutput('tag_name', tag);
+            core.setOutput('sha', context.sha);
+
+      - uses: actions/github-script@v7
+        id: drafts
+        name: Keep the published tag as the generator baseline
+        with:
+          script: |
+            const releases = await github.paginate(github.rest.repos.listReleases, { ...context.repo, per_page: 100 });
+            core.setOutput('pending', releases.some(r => r.draft && /^v\d+\.\d+\.\d+$/.test(r.tag_name)));
+
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        if: steps.drafts.outputs.pending != 'true'
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+          skip-github-release: true
 
       # GITHUB_TOKEN-created approval-required runs emit no workflow_run event.
       # A separate dispatch is native, delayed until after PR creation, and recoverable.

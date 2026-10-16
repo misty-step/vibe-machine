@@ -13,11 +13,11 @@ case "$(uname -s)-$(uname -m)" in
       0878f3313311c2c1b2c818e7c955c0bd828c97b357fa86211b42a5c36d01e36f \
       "$work/ffmpeg.zip" | shasum -a 256 --check
     unzip -p "$work/ffmpeg.zip" ffmpeg > "src-tauri/bin/ffmpeg-$target"
-    file "src-tauri/bin/ffmpeg-$target" | grep -q 'arm64 executable'
+    lipo "src-tauri/bin/ffmpeg-$target" -verify_arch arm64
     ;;
   Darwin-x86_64)
     target=x86_64-apple-darwin
-    file "src-tauri/bin/ffmpeg-$target" | grep -q 'x86_64 executable'
+    lipo "src-tauri/bin/ffmpeg-$target" -verify_arch x86_64
     ;;
   Linux-x86_64)
     target=x86_64-unknown-linux-gnu
