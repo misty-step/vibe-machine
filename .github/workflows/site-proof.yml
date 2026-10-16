@@ -64,7 +64,12 @@ jobs:
           sleep 3
           curl -fsS "https://$WORKER.misty-step.workers.dev/" -o restored-home.html
           cmp prior-home.html restored-home.html
-          test "$(curl -s -o /dev/null -w '%{http_code}' "https://$WORKER.misty-step.workers.dev/changelog")" = 404
+          status=$(curl -sS -D restored-notes.headers -o restored-notes.html -w '%{http_code}' "https://$WORKER.misty-step.workers.dev/changelog?rollback=$PRIOR")
+          printf 'Post-rollback uncached notes status: %s\n' "$status"
+          if [ "$status" != 404 ]; then
+            node -e 'const fs=require("fs");console.log(fs.readFileSync("restored-notes.headers","utf8"));console.log(fs.readFileSync("restored-notes.html","utf8").slice(0,300));'
+            exit 1
+          fi
           printf 'Real preview install, candidate promotion and prior-version rollback PASS\n'
       - name: Delete only the isolated proof Worker and verify absence
         if: always()
