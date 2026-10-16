@@ -1,13 +1,13 @@
 {
   "name": "vibe-machine",
   "private": true,
-  "version": "1.5.0",
+  "version": "1.6.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "pnpm run build:wasm && vite build",
     "preview": "vite preview",
-    "site:build": "node scripts/build-site.mjs",
+    "site:deploy": "wrangler deploy --config site/wrangler.jsonc --env production --keep-vars",
     "build:wasm": "cd crates/vibe-engine && wasm-pack build --target web --out-dir ../../src/vibe-engine-wasm",
     "lint": "eslint .",
     "format": "prettier --write .",
@@ -46,7 +46,6 @@
     "autoprefixer": "^10.4.22",
     "eslint": "^9.39.2",
     "lefthook": "^2.0.16",
-    "marked": "18.1.1",
     "postcss": "^8.5.6",
     "prettier": "^3.8.1",
     "tailwindcss": "3.4.17",
