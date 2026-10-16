@@ -15,7 +15,7 @@ type Options = {
   foreign?: boolean;
   wrongVersion?: boolean;
   movedTag?: boolean;
-  corrupt?: "tag" | "notes";
+  corrupt?: "tag" | "notes" | "prerelease";
 };
 
 async function resumeDraft(options: Options = {}) {
@@ -63,6 +63,7 @@ async function resumeDraft(options: Options = {}) {
               target_commitish: sha,
               tag_name: options.corrupt === "tag" ? "untagged-fixture" : draft.tag_name,
               body: options.corrupt === "notes" ? "Unexpected note rewrite" : draft.body,
+              prerelease: options.corrupt === "prerelease" ? !draft.prerelease : draft.prerelease,
             },
           }),
         },
@@ -139,7 +140,7 @@ describe("unpublished native release recovery", () => {
     }
     await expect(resumeDraft({ wrongVersion: true })).rejects.toThrow("generated source version");
     await expect(resumeDraft({ movedTag: true })).rejects.toThrow("immutable tag");
-    for (const corrupt of ["tag", "notes"] as const) {
+    for (const corrupt of ["tag", "notes", "prerelease"] as const) {
       await expect(resumeDraft({ corrupt })).rejects.toThrow("metadata readback failed");
     }
   });

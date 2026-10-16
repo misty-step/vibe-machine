@@ -75,7 +75,7 @@ jobs:
             }
             await github.rest.repos.updateRelease({ ...context.repo, release_id: draft.id, target_commitish: context.sha, tag_name: tag, name: draft.name, body: draft.body, draft: true, prerelease: draft.prerelease });
             const { data: confirmed } = await github.rest.repos.getRelease({ ...context.repo, release_id: draft.id });
-            if (!confirmed.draft || confirmed.target_commitish !== context.sha || confirmed.tag_name !== tag || confirmed.name !== draft.name || confirmed.body !== draft.body) throw new Error('Draft source/metadata readback failed');
+            if (!confirmed.draft || confirmed.target_commitish !== context.sha || confirmed.tag_name !== tag || confirmed.name !== draft.name || confirmed.body !== draft.body || confirmed.prerelease !== draft.prerelease) throw new Error('Draft source/metadata readback failed');
             core.setOutput('release_created', 'true');
             core.setOutput('id', String(draft.id));
             core.setOutput('tag_name', tag);
