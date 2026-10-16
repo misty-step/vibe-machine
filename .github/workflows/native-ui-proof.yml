@@ -1,0 +1,25 @@
+name: Native UI regression proof
+on:
+  push:
+    branches: [verify/native-ui-probe]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  replay:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch actual native installation screenshots
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download 38832169567 --repo misty-step/vibe-machine --name macos-release-smoke --dir "$RUNNER_TEMP/replay"
+      - name: Accept working prior and rollback, refuse actual blank candidate
+        run: |
+          swift scripts/check-native-ui.swift "$RUNNER_TEMP/replay/prior.png"
+          swift scripts/check-native-ui.swift "$RUNNER_TEMP/replay/rollback.png"
+          if swift scripts/check-native-ui.swift "$RUNNER_TEMP/replay/candidate.png"; then
+            printf '%s\n' 'ERROR: actual blank candidate was accepted'
+            exit 1
+          fi
+          printf '%s\n' 'Actual native good/bad screenshot regressions passed'
