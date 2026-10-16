@@ -103,6 +103,7 @@ function isDenied(relativePath) {
 
 function filePathFor(pathname) {
   if (pathname === "/") return "index.html";
+  if (pathname === "/changelog" || pathname === "/changelog/") return "changelog.html";
   if (pathname === "/favicon.ico") return "favicon.svg";
   return pathname.replace(/^\/+/, "");
 }

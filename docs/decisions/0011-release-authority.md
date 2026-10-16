@@ -20,6 +20,13 @@ not a new credential or a synthetic passing check. GitHub Releases remains the
 artifact origin; the stable DMG alias and Homebrew consumers remain unchanged.
 No second release generator or release-note service is introduced.
 
+The site projects the same `CHANGELOG.md` at build time using Marked, with raw
+HTML, external images and non-repository links disabled. Its CSS comes from the
+existing landing template, not a second design system. CI promotes the tested
+Worker and assets through native Cloudflare versions, retaining existing domain
+routes and monitoring bindings. `/release.json` binds version and full source SHA;
+live byte readback failures restore the previous immutable Worker version.
+
 The repository currently has no `SPEC.md`. Existing README journeys and tests
 are executable evidence, not a replacement specification; the missing product
 specification is a recorded gap rather than invented release acceptance.

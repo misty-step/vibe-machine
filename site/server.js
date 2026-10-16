@@ -39,11 +39,11 @@ function apiResponse(response) {
   };
 }
 
-async function serveFile(response, relativePath, headOnly) {
-  const candidate = resolve(SITE_ROOT, relativePath);
+async function serveFile(root, response, relativePath, headOnly) {
+  const candidate = resolve(root, relativePath);
   if (
     relativePath.startsWith("api/") ||
-    (candidate !== SITE_ROOT && !candidate.startsWith(`${SITE_ROOT}${sep}`))
+    (candidate !== root && !candidate.startsWith(`${root}${sep}`))
   ) {
     response.writeHead(404).end("Not found\n");
     return;
@@ -64,7 +64,7 @@ async function serveFile(response, relativePath, headOnly) {
   }
 }
 
-export function createSiteServer() {
+export function createSiteServer(root = SITE_ROOT) {
   return createServer(async (request, response) => {
     try {
       const { pathname } = new URL(request.url || "/", "http://localhost");
@@ -100,8 +100,10 @@ export function createSiteServer() {
           ? "index.html"
           : decodedPath === "/favicon.ico"
             ? "favicon.svg"
-            : decodedPath.replace(/^\/+/, "");
-      await serveFile(response, relativePath, request.method === "HEAD");
+            : decodedPath === "/changelog" || decodedPath === "/changelog/"
+              ? "changelog.html"
+              : decodedPath.replace(/^\/+/, "");
+      await serveFile(root, response, relativePath, request.method === "HEAD");
     } catch {
       response.writeHead(500).end("Internal server error\n");
     }

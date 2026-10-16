@@ -36,6 +36,22 @@ jobs:
       - name: Build application
         run: pnpm build
 
+      - name: Build the site and its canonical release notes
+        run: |
+          pnpm site:build
+          pnpm exec wrangler versions upload --config site/wrangler.jsonc --env production --dry-run --outdir "$PWD/dist/worker"
+
+      - name: Exercise the compiled Worker with its actual assets
+        run: |
+          pnpm exec wrangler dev "$PWD/dist/worker/worker.js" --no-bundle --config site/wrangler.jsonc --env production --local --port 8787 > "$RUNNER_TEMP/site.log" 2>&1 &
+          worker=$!
+          trap 'kill "$worker" 2>/dev/null || true' EXIT
+          curl --fail --retry 20 --retry-connrefused --retry-delay 1 http://127.0.0.1:8787/release.json -o "$RUNNER_TEMP/release.json"
+          cmp dist/site/release.json "$RUNNER_TEMP/release.json"
+          curl --fail http://127.0.0.1:8787/changelog -o "$RUNNER_TEMP/changelog.html"
+          cmp dist/site/changelog.html "$RUNNER_TEMP/changelog.html"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8787/worker.js)" = 404
+
       - name: Format check
         run: pnpm format:check
 
@@ -47,6 +63,15 @@ jobs:
 
       - name: Test
         run: pnpm test:run
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: site-candidate
+          path: |
+            dist/site
+            dist/worker
+          if-no-files-found: error
+          retention-days: 14
 
   rust:
     runs-on: ubuntu-latest
@@ -87,3 +112,29 @@ jobs:
           if [ "${{ needs.quality.result }}" != "success" ] || [ "${{ needs.rust.result }}" != "success" ]; then
             exit 1
           fi
+
+  deploy-site:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    needs: [quality, rust]
+    runs-on: ubuntu-latest
+    concurrency:
+      group: site-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: site-candidate
+          path: dist
+      - name: Preview and promote the same verified site artifact
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          WRANGLER_SEND_METRICS: "false"
+        run: node scripts/deploy-site.mjs

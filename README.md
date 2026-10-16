@@ -59,9 +59,9 @@ mirrored to another public object store.
 The public experience is the install-command landing page in `site/`, not the
 root Vite preview or Tauri application. The former DigitalOcean Node process
 ran this subproject at revision `d86e970350cb464be2b882e141b8518270e60f53`.
-Its homepage matches that source except for the canonical domain; the favicon
-and legacy observer match byte-for-byte. The existing Cloudflare landing page
-matches current `site/index.html`, `site/favicon.svg`, and `site/sentry.js`.
+Its historical homepage matched that source except for the canonical domain.
+The current site is built into `dist/site` from `site/index.html`, the generated
+`CHANGELOG.md`, and `package.json`; `/release.json` identifies its version and source.
 The approved Sentry cutover replaces the old observer; no UI or media workflow
 is changed by moving the aliases.
 
@@ -75,15 +75,17 @@ in this landing site. Browser monitoring goes directly to Sentry, not a DO
 relay. Desktop media and exports stay outside this deployment.
 
 ```bash
-pnpm site:deploy --dry-run
-pnpm site:deploy --tag <full-reviewed-commit-sha>
+pnpm site:build
+pnpm exec wrangler dev --config site/wrangler.jsonc --env production --local
 ```
 
-Deploy only a reviewed, green revision, after the `vibecheck.design` zone is
-active at the registrar. Authenticate through the existing Cloudflare
-native/pass broker; `--keep-vars` preserves deployed configuration and secrets,
-including the existing Sentry release for unchanged application code. No
-private payloads or credential values belong in deploy output.
+CI builds and exercises the Worker once, then promotes that exact artifact after
+quality and Rust checks pass. Native Cloudflare version previews are checked
+before promotion; all three public origins must serve identical tested bytes.
+An unsuccessful live readback automatically restores and verifies the captured
+prior version. The existing scoped CI secret is the only deploy credential;
+`--keep-vars` retains the Sentry DSN while the release becomes the deployed SHA.
+This code-only path does not edit DNS, routes, signing, or desktop data.
 
 Before delegation, verify registrar ownership, absence of a parent DNSSEC DS
 record, disabled Cloudflare DNSSEC, and a fresh complete DO zone inventory.
