@@ -18,9 +18,21 @@ export function renderNotes(notes) {
       image: ({ text }) => escape(text),
       link({ href, tokens }) {
         const text = this.parser.parseInline(tokens);
-        return /^https:\/\/github\.com\/misty-step\/vibe-machine(?:\/|$)/.test(href)
-          ? `<a href="${escape(href)}">${text}</a>`
-          : text;
+        try {
+          const url = new URL(href);
+          if (
+            url.origin === "https://github.com" &&
+            !url.username &&
+            !url.password &&
+            (url.pathname === "/misty-step/vibe-machine" ||
+              url.pathname.startsWith("/misty-step/vibe-machine/"))
+          ) {
+            return `<a href="${escape(url.href)}">${text}</a>`;
+          }
+        } catch {
+          // Relative and malformed destinations remain readable text.
+        }
+        return text;
       },
     },
   }).parse(notes.replace(/^# Changelog\s*\n/, ""));

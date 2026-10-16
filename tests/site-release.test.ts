@@ -54,6 +54,12 @@ describe("canonical site publication", () => {
     expect(html).not.toContain("<img");
     expect(html).not.toContain('href="javascript:');
     expect(html).toContain('href="https://github.com/misty-step/vibe-machine/releases"');
+    expect(
+      renderNotes("[outside](https://github.com/misty-step/vibe-machine/../../attacker/phishing)")
+    ).not.toContain("href=");
+    expect(
+      renderNotes("[outside](https://github.com/misty-step/vibe-machine/%2e%2e/%2e%2e/attacker)")
+    ).not.toContain("href=");
   });
 
   it("serves generated notes through the real HTTP consumer, including HEAD and rejection", async () => {
