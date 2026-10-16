@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.5.0](https://github.com/misty-step/vibe-machine/compare/v1.4.0...v1.5.0) (2026-10-15)
+
+
+### Features
+
+* **site:** integrate Vibe Machine with Canary ([96a3e2e](https://github.com/misty-step/vibe-machine/commit/96a3e2e1137d1c68f0dac976c41ad05ed5ca2cdc))
+* **site:** native, injectable Sentry monitoring; retire the legacy observer ([#189](https://github.com/misty-step/vibe-machine/issues/189)) ([5cdea40](https://github.com/misty-step/vibe-machine/commit/5cdea40456c88e73d09127d22030c1b051d1dd71))
+
+
+### Bug Fixes
+
+* **build:** restore verified native application packaging ([#208](https://github.com/misty-step/vibe-machine/issues/208)) ([8dcaef1](https://github.com/misty-step/vibe-machine/commit/8dcaef1a4277f67b0feb16baa524f2d57374a7b9))
+* **release:** build verified source with one application version ([#206](https://github.com/misty-step/vibe-machine/issues/206)) ([a0555e3](https://github.com/misty-step/vibe-machine/commit/a0555e32b39e05fb7f1add536e684d9ba2e66b98))
+* **release:** dispatch bot CI approval through native GitHub events ([#207](https://github.com/misty-step/vibe-machine/issues/207)) ([e340f76](https://github.com/misty-step/vibe-machine/commit/e340f76ad63b06a469627bb77f2683ba22307019))
+* **site:** cut Canary fallback over to DigitalOcean ([#164](https://github.com/misty-step/vibe-machine/issues/164)) ([47f91ad](https://github.com/misty-step/vibe-machine/commit/47f91ad550e7d7bbddcfd68b90dccae937ecb7dd))
+* **site:** health-check the active Canary reporter ([#162](https://github.com/misty-step/vibe-machine/issues/162)) ([1e2e3ed](https://github.com/misty-step/vibe-machine/commit/1e2e3edce4f3fa9a58fd5a7ea55a0a18d680b7a3))
+* **site:** preserve parity on DigitalOcean ([#161](https://github.com/misty-step/vibe-machine/issues/161)) ([02a94cf](https://github.com/misty-step/vibe-machine/commit/02a94cf7b6eb1c779514fdab71584fc0e301fa62))
+
 ## [1.4.0](https://github.com/misty-step/vibe-machine/compare/v1.3.2...v1.4.0) (2026-01-21)
 
 
