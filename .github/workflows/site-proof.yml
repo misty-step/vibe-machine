@@ -1,0 +1,58 @@
+name: Isolated site rollback proof
+on:
+  push:
+    branches: [verify/site-rollback]
+permissions:
+  contents: read
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      WRANGLER_SEND_METRICS: "false"
+      WORKER: vibe-machine-site-cd-proof
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Compile prior source and candidate exactly once
+        run: |
+          mkdir -p prior
+          git archive 9f5410ddfe42e754d613f44f41ef9eec00563995 site | tar -xf - -C prior
+          pnpm exec wrangler versions upload --config prior/site/wrangler.jsonc --env staging --dry-run --outdir "$PWD/prior/compiled"
+          pnpm site:build
+          pnpm exec wrangler versions upload --config site/wrangler.jsonc --env production --dry-run --outdir "$PWD/dist/worker"
+      - name: Install prior artifact on the isolated Worker
+        run: |
+          WRANGLER_OUTPUT_FILE_PATH="$PWD/prior.jsonl" pnpm exec wrangler deploy "$PWD/prior/compiled/worker.js" --no-bundle --config prior/site/wrangler.jsonc --env staging --name "$WORKER"
+          node -e 'const fs=require("fs"); const x=fs.readFileSync("prior.jsonl","utf8").trim().split("\n").map(JSON.parse).find(x=>x.type==="deploy"); fs.appendFileSync(process.env.GITHUB_ENV,`PRIOR=${x.version_id}\n`);'
+          curl -fsS --retry 10 --retry-all-errors --retry-delay 2 "https://$WORKER.misty-step.workers.dev/" -o prior-home.html
+          cmp prior/site/index.html prior-home.html
+      - name: Preview and promote the candidate artifact
+        run: |
+          WRANGLER_OUTPUT_FILE_PATH="$PWD/candidate.jsonl" pnpm exec wrangler versions upload "$PWD/dist/worker/worker.js" --no-bundle --config site/wrangler.jsonc --env staging --name "$WORKER" --tag "$GITHUB_SHA"
+          node -e 'const fs=require("fs"); const x=fs.readFileSync("candidate.jsonl","utf8").trim().split("\n").map(JSON.parse).find(x=>x.type==="version-upload"); fs.appendFileSync(process.env.GITHUB_ENV,`CANDIDATE=${x.version_id}\nPREVIEW=${x.preview_url}\n`);'
+      - name: Prove candidate and restore the prior immutable version
+        run: |
+          curl -fsS --retry 10 --retry-all-errors --retry-delay 2 "$PREVIEW/changelog" -o preview-notes.html
+          cmp dist/site/changelog.html preview-notes.html
+          pnpm exec wrangler versions deploy "$CANDIDATE@100%" --yes --config site/wrangler.jsonc --env staging --name "$WORKER"
+          curl -fsS "https://$WORKER.misty-step.workers.dev/release.json" -o candidate-release.json
+          cmp dist/site/release.json candidate-release.json
+          pnpm exec wrangler versions deploy "$PRIOR@100%" --yes --config site/wrangler.jsonc --env staging --name "$WORKER"
+          curl -fsS "https://$WORKER.misty-step.workers.dev/" -o restored-home.html
+          cmp prior-home.html restored-home.html
+          test "$(curl -s -o /dev/null -w '%{http_code}' "https://$WORKER.misty-step.workers.dev/changelog")" = 404
+          printf 'Real preview install, candidate promotion and prior-version rollback PASS\n'
+      - name: Delete only the isolated proof Worker and verify absence
+        if: always()
+        run: |
+          pnpm exec wrangler delete --name "$WORKER" --config site/wrangler.jsonc --env staging --force
+          code=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/b069014f6a46558ea9146fb6c4ff8f6c/workers/scripts/$WORKER")
+          test "$code" = 404
