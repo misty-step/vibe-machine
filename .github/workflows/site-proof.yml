@@ -28,10 +28,24 @@ jobs:
           pnpm exec wrangler versions upload --config prior/site/wrangler.jsonc --env staging --dry-run --outdir "$PWD/prior/compiled"
           pnpm site:build
           pnpm exec wrangler versions upload --config site/wrangler.jsonc --env production --dry-run --outdir "$PWD/dist/worker"
+      - name: Refuse a genuinely older source before any production write
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pnpm exec wrangler deployments list --json --config site/wrangler.jsonc --env production > before.json
+          cp dist/site/release.json candidate-identity.json
+          OLD=$(git rev-parse v1.4.0^{})
+          OLD="$OLD" node -e 'const fs=require("fs");const x=JSON.parse(fs.readFileSync("dist/site/release.json"));x.revision=process.env.OLD;fs.writeFileSync("dist/site/release.json",JSON.stringify(x));'
+          if GITHUB_SHA="$OLD" node scripts/deploy-site.mjs > refused.log 2>&1; then exit 1; fi
+          node -e 'require("node:assert/strict").ok(require("fs").readFileSync("refused.log","utf8").includes("Refusing a regression from deployed source"))'
+          mv candidate-identity.json dist/site/release.json
+          pnpm exec wrangler deployments list --json --config site/wrangler.jsonc --env production > after.json
+          cmp before.json after.json
       - name: Install prior artifact on the isolated Worker
         run: |
           WRANGLER_OUTPUT_FILE_PATH="$PWD/prior.jsonl" pnpm exec wrangler deploy "$PWD/prior/compiled/worker.js" --no-bundle --config prior/site/wrangler.jsonc --env staging --name "$WORKER"
           node -e 'const fs=require("fs"); const x=fs.readFileSync("prior.jsonl","utf8").trim().split("\n").map(JSON.parse).find(x=>x.type==="deploy"); fs.appendFileSync(process.env.GITHUB_ENV,`PRIOR=${x.version_id}\n`);'
+          sleep 3
           curl -fsS --retry 10 --retry-all-errors --retry-delay 2 "https://$WORKER.misty-step.workers.dev/" -o prior-home.html
           cmp prior/site/index.html prior-home.html
       - name: Preview and promote the candidate artifact
@@ -43,9 +57,11 @@ jobs:
           curl -fsS --retry 10 --retry-all-errors --retry-delay 2 "$PREVIEW/changelog" -o preview-notes.html
           cmp dist/site/changelog.html preview-notes.html
           pnpm exec wrangler versions deploy "$CANDIDATE@100%" --yes --config site/wrangler.jsonc --env staging --name "$WORKER"
-          curl -fsS "https://$WORKER.misty-step.workers.dev/release.json" -o candidate-release.json
+          sleep 3
+          curl -fsS --retry 10 --retry-all-errors --retry-delay 2 "https://$WORKER.misty-step.workers.dev/release.json" -o candidate-release.json
           cmp dist/site/release.json candidate-release.json
           pnpm exec wrangler versions deploy "$PRIOR@100%" --yes --config site/wrangler.jsonc --env staging --name "$WORKER"
+          sleep 3
           curl -fsS "https://$WORKER.misty-step.workers.dev/" -o restored-home.html
           cmp prior-home.html restored-home.html
           test "$(curl -s -o /dev/null -w '%{http_code}' "https://$WORKER.misty-step.workers.dev/changelog")" = 404
@@ -53,6 +69,7 @@ jobs:
       - name: Delete only the isolated proof Worker and verify absence
         if: always()
         run: |
-          pnpm exec wrangler delete --name "$WORKER" --config site/wrangler.jsonc --env staging --force
+          deleted=$(curl -sS -o /dev/null -w '%{http_code}' -X DELETE -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/b069014f6a46558ea9146fb6c4ff8f6c/workers/scripts/$WORKER")
+          test "$deleted" = 200 || test "$deleted" = 404
           code=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/b069014f6a46558ea9146fb6c4ff8f6c/workers/scripts/$WORKER")
           test "$code" = 404
