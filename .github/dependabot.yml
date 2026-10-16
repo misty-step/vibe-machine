@@ -5,6 +5,9 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
+    groups:
+      react-runtime:
+        patterns: ["react", "react-dom"]
   - package-ecosystem: "cargo"
     directory: "/src-tauri"
     schedule:

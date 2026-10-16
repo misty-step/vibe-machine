@@ -27,6 +27,6 @@ Worker and assets through native Cloudflare versions, retaining existing domain
 routes and monitoring bindings. `/release.json` binds version and full source SHA;
 live byte readback failures restore the previous immutable Worker version.
 
-The repository currently has no `SPEC.md`. Existing README journeys and tests
-are executable evidence, not a replacement specification; the missing product
-specification is a recorded gap rather than invented release acceptance.
+`SPEC.md` records the known startup, distribution and settings-preservation
+stories. Detailed media/rendering and native theme contracts remain explicit
+product-specification gaps rather than invented release acceptance.

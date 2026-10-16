@@ -187,6 +187,15 @@ jobs:
       - name: Setup FFmpeg
         run: ./scripts/setup-ffmpeg.sh
 
+      - name: Build the application frontend once
+        run: pnpm build
+
+      - name: Exercise the exact frontend before native packaging
+        timeout-minutes: 2
+        env:
+          CHROME_BIN: /Applications/Google Chrome.app/Contents/MacOS/Google Chrome
+        run: node scripts/smoke-app.mjs
+
       - name: Build Tauri App
         uses: tauri-apps/tauri-action@v0
         env:
@@ -204,7 +213,7 @@ jobs:
           # Don't set releaseName - preserves release-please changelog
           releaseDraft: true
           prerelease: false
-          args: --target aarch64-apple-darwin
+          args: --target aarch64-apple-darwin --config '{"build":{"beforeBuildCommand":null}}'
 
       - name: Exercise native install, update, rollback and bundled codecs
         env:
