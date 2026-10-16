@@ -15,6 +15,7 @@ type Options = {
   foreign?: boolean;
   wrongVersion?: boolean;
   movedTag?: boolean;
+  corrupt?: "tag" | "notes";
 };
 
 async function resumeDraft(options: Options = {}) {
@@ -25,6 +26,9 @@ async function resumeDraft(options: Options = {}) {
     assets: options.assets ? [{}] : [],
     author: { login: options.foreign ? "other" : "github-actions[bot]" },
     tag_name: `v${version}`,
+    name: `v${version}`,
+    body: "Canonical generated release notes",
+    prerelease: false,
   };
   const outputs: Record<string, string> = {};
   let writes = 0;
@@ -41,11 +45,26 @@ async function resumeDraft(options: Options = {}) {
               ).toString("base64"),
             },
           }),
-          updateRelease: async (request: { target_commitish: string }) => {
+          updateRelease: async (request: {
+            target_commitish: string;
+            tag_name: string;
+            body: string;
+            draft: boolean;
+          }) => {
             expect(request.target_commitish).toBe(sha);
+            expect(request.tag_name).toBe(draft.tag_name);
+            expect(request.body).toBe(draft.body);
+            expect(request.draft).toBe(true);
             writes++;
           },
-          getRelease: async () => ({ data: { ...draft, target_commitish: sha } }),
+          getRelease: async () => ({
+            data: {
+              ...draft,
+              target_commitish: sha,
+              tag_name: options.corrupt === "tag" ? "untagged-fixture" : draft.tag_name,
+              body: options.corrupt === "notes" ? "Unexpected note rewrite" : draft.body,
+            },
+          }),
         },
         git: {
           getRef: async () => {
@@ -109,6 +128,7 @@ describe("unpublished native release recovery", () => {
     const result = await resumeDraft();
     expect(result.writes).toBe(1);
     expect(result.outputs.release_created).toBe("true");
+    expect(result.outputs.id).toBe("7");
     expect(result.outputs.sha).toBe("a".repeat(40));
     expect(result.outputs.tag_name).toBe(`v${version}`);
   });
@@ -119,5 +139,8 @@ describe("unpublished native release recovery", () => {
     }
     await expect(resumeDraft({ wrongVersion: true })).rejects.toThrow("generated source version");
     await expect(resumeDraft({ movedTag: true })).rejects.toThrow("immutable tag");
+    for (const corrupt of ["tag", "notes"] as const) {
+      await expect(resumeDraft({ corrupt })).rejects.toThrow("metadata readback failed");
+    }
   });
 });

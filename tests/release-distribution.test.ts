@@ -28,6 +28,40 @@ async function checkSource(head: string, conclusion?: string) {
   );
 }
 
+async function checkDraftSource(
+  conclusion?: string,
+  changes: Partial<{ draft: boolean; tag_name: string; target_commitish: string }> = {}
+) {
+  const sha = "a".repeat(40);
+  return new AsyncFunction(
+    "github",
+    "context",
+    "process",
+    scripts.find((s) => s.includes("Missing release source"))
+  )(
+    {
+      rest: {
+        repos: {
+          getRelease: async (request: { release_id: number }) => {
+            expect(request.release_id).toBe(7);
+            return {
+              data: { draft: true, tag_name: "candidate-tag", target_commitish: sha, ...changes },
+            };
+          },
+        },
+        actions: {
+          listWorkflowRuns: async (request: { head_sha: string }) => {
+            expect(request.head_sha).toBe(sha);
+            return { data: { workflow_runs: [{ conclusion }] } };
+          },
+        },
+      },
+    },
+    { repo: {} },
+    { env: { RELEASE_SHA: sha, RELEASE_ID: "7", RELEASE_TAG: "candidate-tag" } }
+  );
+}
+
 describe("release distribution", () => {
   it("uses manifest mode and Tauri's native package version reference", () => {
     expect(releaseWorkflow).not.toMatch(/^ {10}release-type:/m);
@@ -47,43 +81,28 @@ describe("release distribution", () => {
   });
 
   it("checks the draft's actual source, not a later green commit", async () => {
-    const sha = "a".repeat(40);
-    const previous = process.env.RELEASE_SHA;
-    process.env.RELEASE_SHA = sha;
-    try {
-      for (const conclusion of [undefined, "failure", "skipped", "success"]) {
-        const check = new AsyncFunction(
-          "github",
-          "context",
-          "process",
-          scripts.find((s) => s.includes("Missing release source"))
-        )(
-          {
-            rest: {
-              actions: {
-                listWorkflowRuns: async (request: { head_sha: string }) => {
-                  expect(request.head_sha).toBe(sha);
-                  return { data: { workflow_runs: [{ conclusion }] } };
-                },
-              },
-            },
-          },
-          { repo: {} },
-          process
-        );
-        if (conclusion === "success") await expect(check).resolves.toBeUndefined();
-        else await expect(check).rejects.toThrow("Actual release source");
-      }
-      expect(JSON.parse(readFileSync("release-please-config.json", "utf8")).draft).toBe(true);
-      expect(releaseWorkflow).toContain("--draft=false --latest");
-    } finally {
-      if (previous === undefined) delete process.env.RELEASE_SHA;
-      else process.env.RELEASE_SHA = previous;
+    for (const conclusion of [undefined, "failure", "skipped", "success"]) {
+      const check = checkDraftSource(conclusion);
+      if (conclusion === "success") await expect(check).resolves.toBeUndefined();
+      else await expect(check).rejects.toThrow("Actual release source");
+    }
+    expect(JSON.parse(readFileSync("release-please-config.json", "utf8")).draft).toBe(true);
+    expect(releaseWorkflow).toContain("--draft=false --latest");
+  });
+
+  it("binds the canonical release ID to its unpublished source and tag", async () => {
+    for (const changes of [
+      { draft: false },
+      { tag_name: "untagged-fixture" },
+      { target_commitish: "b".repeat(40) },
+    ]) {
+      await expect(checkDraftSource("success", changes)).rejects.toThrow("Draft ID does not match");
     }
   });
 
   it("publishes the DMG only through GitHub Releases", () => {
     expect(releaseWorkflow).toContain("tauri-apps/tauri-action");
+    expect(releaseWorkflow).toContain("releaseId: ${{ needs.release-please.outputs.release_id }}");
     expect(releaseWorkflow).toContain("GitHub Releases is the canonical download origin");
     expect(releaseWorkflow).toContain("gh release upload");
     expect(releaseWorkflow).toContain("vibe-machine-latest.dmg");

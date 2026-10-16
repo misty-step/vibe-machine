@@ -32,6 +32,7 @@ jobs:
       release_created: ${{ steps.release.outputs.release_created || steps.resume.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name || steps.resume.outputs.tag_name }}
       sha: ${{ steps.release.outputs.sha || steps.resume.outputs.sha }}
+      release_id: ${{ steps.release.outputs.id || steps.resume.outputs.id }}
     steps:
       - uses: actions/github-script@v7
         name: Require green CI on the current source
@@ -72,10 +73,11 @@ jobs:
             } catch (error) {
               if (error.status !== 404) throw error;
             }
-            await github.rest.repos.updateRelease({ ...context.repo, release_id: draft.id, target_commitish: context.sha });
+            await github.rest.repos.updateRelease({ ...context.repo, release_id: draft.id, target_commitish: context.sha, tag_name: tag, name: draft.name, body: draft.body, draft: true, prerelease: draft.prerelease });
             const { data: confirmed } = await github.rest.repos.getRelease({ ...context.repo, release_id: draft.id });
-            if (!confirmed.draft || confirmed.target_commitish !== context.sha) throw new Error('Draft source readback failed');
+            if (!confirmed.draft || confirmed.target_commitish !== context.sha || confirmed.tag_name !== tag || confirmed.name !== draft.name || confirmed.body !== draft.body) throw new Error('Draft source/metadata readback failed');
             core.setOutput('release_created', 'true');
+            core.setOutput('id', String(draft.id));
             core.setOutput('tag_name', tag);
             core.setOutput('sha', context.sha);
 
@@ -143,6 +145,7 @@ jobs:
       contents: write
     env:
       RELEASE_TAG: ${{ needs.release-please.outputs.tag_name }}
+      RELEASE_ID: ${{ needs.release-please.outputs.release_id }}
     steps:
       - uses: actions/github-script@v7
         name: Require green CI for the actual draft release source
@@ -154,6 +157,8 @@ jobs:
             if (!/^[0-9a-f]{40}$/.test(sha || '')) throw new Error('Missing release source');
             const { data } = await github.rest.actions.listWorkflowRuns({ ...context.repo, workflow_id: 'ci.yml', head_sha: sha, event: 'push', per_page: 1 });
             if (data.workflow_runs[0]?.conclusion !== 'success') throw new Error('Actual release source has no successful CI');
+            const { data: release } = await github.rest.repos.getRelease({ ...context.repo, release_id: Number(process.env.RELEASE_ID) });
+            if (!release.draft || release.tag_name !== process.env.RELEASE_TAG || release.target_commitish !== sha) throw new Error('Draft ID does not match the verified source/tag');
 
       # Draft tags are not public yet; build the generator's exact source SHA.
       - uses: actions/checkout@v4
@@ -171,6 +176,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+          cache-on-failure: true
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -193,6 +199,7 @@ jobs:
           # APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
+          releaseId: ${{ needs.release-please.outputs.release_id }}
           tagName: ${{ env.RELEASE_TAG }}
           # Don't set releaseName - preserves release-please changelog
           releaseDraft: true
