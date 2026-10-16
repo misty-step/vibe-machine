@@ -56,7 +56,7 @@ for label, image, expected in [
         try:
             time.sleep(7)
             assert process.poll() is None, f"{label} exited: {process.returncode}"
-            run("screencapture", "-x", str(evidence / f"{label}.png"))
+            print(run("swift", "scripts/check-native-ui.swift", str(evidence / f"{label}.png"), str(process.pid)), flush=True)
         finally:
             if process.poll() is None:
                 process.terminate()

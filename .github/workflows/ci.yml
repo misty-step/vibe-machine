@@ -36,6 +36,10 @@ jobs:
       - name: Build application
         run: pnpm build
 
+      - name: Exercise the compiled application in a real browser
+        timeout-minutes: 2
+        run: node scripts/smoke-app.mjs
+
       - name: Build the site and its canonical release notes
         run: |
           pnpm site:build
