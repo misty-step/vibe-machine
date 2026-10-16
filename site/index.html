@@ -15,11 +15,41 @@
       @import url("https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap");
 
       :root {
+        color-scheme: dark;
         --void: #030304;
         --carbon: #0a0a0b;
         --plasma: #ffb703;
         --flux: #0ea5e9;
         --glass: rgba(255, 255, 255, 0.06);
+        --ink: #e4e4e7;
+        --heading: #fff;
+      }
+
+      @media (prefers-color-scheme: light) {
+        :root {
+          color-scheme: light;
+          --void: #fafafa;
+          --carbon: #fff;
+          --plasma: #815300;
+          --flux: #006e9e;
+          --glass: rgba(0, 0, 0, 0.05);
+          --ink: #27272a;
+          --heading: #111114;
+        }
+
+        .scanlines,
+        .vignette {
+          display: none;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation: none !important;
+          transition: none !important;
+        }
       }
 
       * {
@@ -31,7 +61,7 @@
       body {
         min-height: 100vh;
         background: var(--void);
-        color: #e4e4e7;
+        color: var(--ink);
         font-family: ui-monospace, "SF Mono", monospace;
         overflow: hidden;
         position: relative;
@@ -140,7 +170,7 @@
         letter-spacing: -0.02em;
         line-height: 0.9;
         text-transform: uppercase;
-        color: #fff;
+        color: var(--heading);
         text-shadow:
           0 0 60px rgba(14, 165, 233, 0.4),
           0 0 120px rgba(14, 165, 233, 0.2);
@@ -256,11 +286,11 @@
         font-size: 0.75rem;
         letter-spacing: 0.1em;
         text-transform: uppercase;
-        z-index: 10;
+        z-index: 110;
       }
 
       .links a {
-        color: #52525b;
+        color: var(--flux);
         text-decoration: none;
         transition: color 0.2s;
       }
@@ -298,6 +328,11 @@
         }
         .links {
           gap: 1.5rem;
+          bottom: 64px;
+          width: max-content;
+          max-width: calc(100% - 2rem);
+          flex-wrap: wrap;
+          justify-content: center;
         }
       }
     </style>
@@ -308,14 +343,13 @@
     <div class="vignette"></div>
 
     <div class="hud hud-tl">
-      <span>SYS::MACOS_11+</span>
+      <span>SYS::MACOS_12+</span>
       <span>ARCH::ARM64</span>
       <span class="highlight">STATUS::READY</span>
     </div>
 
     <div class="hud hud-tr">
-      <span>BUILD::2025.12</span>
-      <span>SIZE::~500MB</span>
+      <span>BUILD::{{version}}</span>
     </div>
 
     <div class="hud hud-bl">
@@ -375,10 +409,11 @@
       </script>
     </main>
 
-    <div class="links">
+    <nav class="links" aria-label="Project">
+      <a href="/changelog">Changelog</a>
       <a href="https://mistystep.io" target="_blank" rel="noopener noreferrer"
         >a misty step project</a
       >
-    </div>
+    </nav>
   </body>
 </html>

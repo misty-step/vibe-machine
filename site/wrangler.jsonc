@@ -6,7 +6,7 @@
   "compatibility_flags": ["nodejs_compat"],
   "main": "worker.js",
   "assets": {
-    "directory": "./",
+    "directory": "../dist/site",
     "binding": "ASSETS",
     "html_handling": "none",
     "not_found_handling": "none",
@@ -25,6 +25,7 @@
     "production": {
       "name": "vibe-machine-site",
       "workers_dev": false,
+      "preview_urls": true,
       // Browser monitoring stays off until a deploy provides SENTRY_DSN
       // (public DSN). SENTRY_RELEASE is optional. No DSN is committed here.
       "routes": [
