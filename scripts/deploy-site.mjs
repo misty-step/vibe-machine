@@ -2,20 +2,33 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { readFile, rm } from "node:fs/promises";
 import { resolve } from "node:path";
+import { unstable_readConfig } from "wrangler";
 
 const revision = process.env.GITHUB_SHA;
 assert.equal(process.env.GITHUB_ACTIONS, "true", "Deploy through repository CI only");
 assert.match(revision || "", /^[0-9a-f]{40}$/);
 const receipt = resolve("dist/site-upload.jsonl");
 const common = ["--config", "site/wrangler.jsonc", "--env", "production"];
+const config = unstable_readConfig({ config: "site/wrangler.jsonc", env: "production" });
+assert.equal(config.name, "vibe-machine-site");
 const wrangler = (...args) =>
   execFileSync("pnpm", ["exec", "wrangler", ...args, ...common], { encoding: "utf8" });
-const source = () =>
-  execFileSync(
-    "gh",
-    ["api", "repos/misty-step/vibe-machine/git/ref/heads/master", "--jq", ".object.sha"],
-    { encoding: "utf8" }
-  ).trim();
+async function subdomain(method = "GET", body) {
+  const response = await fetch(
+    `https://api.cloudflare.com/client/v4/accounts/${config.account_id}/workers/scripts/${config.name}/subdomain`,
+    {
+      method,
+      headers: {
+        Authorization: `Bearer ${process.env.CLOUDFLARE_API_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    }
+  );
+  const payload = await response.json();
+  assert.ok(response.ok && payload.success, `Worker preview setting failed: ${response.status}`);
+  return payload.result;
+}
 const download = (url) =>
   execFileSync("curl", [
     "--fail",
@@ -62,9 +75,38 @@ async function verify(origin) {
   assert.equal(JSON.parse(download(`${origin}/api/health`)).status, "ok");
 }
 
-assert.equal(source(), revision, "Refusing stale site source");
 const previous = current();
+const previousVersion = JSON.parse(wrangler("versions", "view", previous, "--json"));
+const deployedRevision = previousVersion.annotations?.["workers/tag"];
+assert.match(deployedRevision || "", /^[0-9a-f]{40}$/, "Deployed source must be known");
+const comparison = execFileSync(
+  "gh",
+  [
+    "api",
+    `repos/misty-step/vibe-machine/compare/${deployedRevision}...${revision}`,
+    "--jq",
+    ".status",
+  ],
+  { encoding: "utf8" }
+).trim();
+assert.ok(
+  ["ahead", "identical"].includes(comparison),
+  "Refusing a regression from deployed source"
+);
+if (comparison === "identical") {
+  for (const origin of origins) await verify(origin);
+  console.log(JSON.stringify({ revision, workerVersion: previous, noOp: true, verified: true }));
+  process.exit(0);
+}
 const previousHome = download(origins[0] + "/");
+const settings = await subdomain();
+assert.equal(settings.enabled, false, "Retain the existing custom-domain-only production route");
+if (!settings.previews_enabled) {
+  await subdomain("POST", { enabled: false, previews_enabled: true });
+  const confirmed = await subdomain();
+  assert.equal(confirmed.enabled, false);
+  assert.equal(confirmed.previews_enabled, true);
+}
 await rm(receipt, { force: true });
 process.env.WRANGLER_OUTPUT_FILE_PATH = receipt;
 process.stdout.write(
@@ -88,7 +130,6 @@ assert.equal(uploaded?.worker_name, "vibe-machine-site");
 assert.match(uploaded.version_id, /^[0-9a-f-]{36}$/);
 assert.ok(uploaded.preview_url, "A native preview URL is required before promotion");
 await verify(uploaded.preview_url.replace(/\/$/, ""));
-assert.equal(source(), revision, "Source moved while the candidate was verified");
 
 try {
   process.stdout.write(
