@@ -67,6 +67,44 @@ async function resumeDraft(options: Options = {}) {
 }
 
 describe("unpublished native release recovery", () => {
+  it("requires the manifest's actual tag, not draft-list visibility, before preparing another PR", async () => {
+    const source = scripts.find((s) => s.includes("Missing generator baseline version"));
+    for (const status of [undefined, 404, 403, 500]) {
+      const outputs: Record<string, string> = {};
+      const check = new AsyncFunction("github", "context", "core", source)(
+        {
+          rest: {
+            repos: {
+              getContent: async () => ({
+                data: { content: Buffer.from(JSON.stringify({ ".": version })).toString("base64") },
+              }),
+            },
+            git: {
+              getRef: async (request: { ref: string }) => {
+                expect(request.ref).toBe(`tags/v${version}`);
+                if (status) throw Object.assign(new Error("Tag lookup failed"), { status });
+                return { data: { object: { sha: "a".repeat(40) } } };
+              },
+            },
+          },
+        },
+        { repo: {}, sha: "a".repeat(40) },
+        {
+          setOutput: (key: string, value: string) => {
+            outputs[key] = value;
+          },
+        }
+      );
+      if (status === 403 || status === 500)
+        await expect(check).rejects.toThrow("Tag lookup failed");
+      else {
+        await check;
+        expect(outputs.exists).toBe(status === 404 ? "false" : "true");
+      }
+    }
+    expect(workflow).toContain("if: steps.baseline.outputs.exists == 'true'");
+  });
+
   it("resumes an empty bot draft at the verified source, retaining the generated version", async () => {
     const result = await resumeDraft();
     expect(result.writes).toBe(1);
