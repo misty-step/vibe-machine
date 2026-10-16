@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.6.0](https://github.com/misty-step/vibe-machine/compare/v1.5.0...v1.6.0) (2026-10-16)
+
+
+### Features
+
+* **site:** publish release notes with verified continuous delivery ([#210](https://github.com/misty-step/vibe-machine/issues/210)) ([15e8661](https://github.com/misty-step/vibe-machine/commit/15e86616179e1da2fe94596c69740cd0c718af5c))
+
+
+### Bug Fixes
+
+* restore compiled app startup and reject blank native windows ([#217](https://github.com/misty-step/vibe-machine/issues/217)) ([61893ee](https://github.com/misty-step/vibe-machine/commit/61893ee09a4fe75a4714e2c59d76c745a6d1adcf))
+
 ## [1.5.0](https://github.com/misty-step/vibe-machine/compare/v1.4.0...v1.5.0) (2026-10-15)
 
 
