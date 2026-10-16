@@ -1,9 +1,11 @@
 import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
+import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { buildSite, renderNotes } from "../scripts/build-site.mjs";
+import { verifyBytes } from "../scripts/verify-site.mjs";
 import { createSiteServer } from "../site/server";
 
 const directories: string[] = [];
@@ -24,6 +26,26 @@ async function candidate() {
 }
 
 describe("canonical site publication", () => {
+  it("waits for actual bytes across stale-200 and missing-asset edge responses", async () => {
+    const { output } = await candidate();
+    const file = join(output, "changelog.html");
+    const expected = await readFile(file);
+    let requests = 0;
+    const server = createServer((request, response) => {
+      if (request.url === "/never") return response.end("Prior artifact");
+      requests++;
+      if (requests === 1) return response.end("Prior artifact");
+      if (requests === 2) return response.writeHead(404).end("Not found\n");
+      response.end(expected);
+    });
+    servers.push(server);
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    await verifyBytes(origin, file, 4);
+    expect(requests).toBe(3);
+    await expect(verifyBytes(`${origin}/never`, file, 1)).rejects.toThrow("Artifact mismatch");
+  }, 10000);
+
   it("projects notes and version without mutating their authority or uploading source", async () => {
     const before = await readFile("CHANGELOG.md", "utf8");
     const metadata = await candidate();

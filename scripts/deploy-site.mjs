@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { readFile, rm } from "node:fs/promises";
+import { readFile, rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { unstable_readConfig } from "wrangler";
+import { verifyBytes } from "./verify-site.mjs";
 
 const revision = process.env.GITHUB_SHA;
 assert.equal(process.env.GITHUB_ACTIONS, "true", "Deploy through repository CI only");
@@ -66,11 +67,7 @@ async function verify(origin) {
     ["/sentry.js", "sentry.js"],
     ["/favicon.ico", "favicon.svg"],
   ]) {
-    assert.deepEqual(
-      download(`${origin}${path}?revision=${revision}`),
-      await readFile(`dist/site/${file}`),
-      `Artifact mismatch at ${origin}${path}`
-    );
+    await verifyBytes(`${origin}${path}?revision=${revision}`, `dist/site/${file}`);
   }
   assert.equal(JSON.parse(download(`${origin}/api/health`)).status, "ok");
 }
@@ -99,6 +96,7 @@ if (comparison === "identical") {
   process.exit(0);
 }
 const previousHome = download(origins[0] + "/");
+await writeFile("dist/prior-site.html", previousHome);
 const settings = await subdomain();
 assert.equal(settings.enabled, false, "Retain the existing custom-domain-only production route");
 if (!settings.previews_enabled) {
@@ -160,11 +158,7 @@ try {
     )
   );
   assert.equal(current(), previous);
-  assert.deepEqual(
-    download(origins[0] + "/"),
-    previousHome,
-    "Rollback did not restore the prior homepage"
-  );
+  await verifyBytes(origins[0] + "/", "dist/prior-site.html");
   console.error("Prior site artifact restored and verified");
   throw error;
 }
