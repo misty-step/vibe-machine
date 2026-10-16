@@ -11,7 +11,11 @@ const scripts = [...releaseWorkflow.matchAll(/ {10}script: \|\n((?: {12}.*\n|\n)
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 
 async function checkSource(head: string, conclusion?: string) {
-  await new AsyncFunction("github", "context", scripts[0])(
+  await new AsyncFunction(
+    "github",
+    "context",
+    scripts.find((s) => s.includes("Refusing stale"))
+  )(
     {
       rest: {
         repos: { getBranch: async () => ({ data: { commit: { sha: head } } }) },
@@ -48,7 +52,12 @@ describe("release distribution", () => {
     process.env.RELEASE_SHA = sha;
     try {
       for (const conclusion of [undefined, "failure", "skipped", "success"]) {
-        const check = new AsyncFunction("github", "context", "process", scripts[2])(
+        const check = new AsyncFunction(
+          "github",
+          "context",
+          "process",
+          scripts.find((s) => s.includes("Missing release source"))
+        )(
           {
             rest: {
               actions: {
