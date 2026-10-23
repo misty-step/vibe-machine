@@ -1,13 +1,35 @@
 import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
 import { LazyStore } from "@tauri-apps/plugin-store";
+import { isTauri, tauriInvoke } from "../platform/tauriEnv";
 import { VibeSettings, VisualizerMode, AspectRatio, FontFamily, FontSize, Track } from "../types";
 
 const settingsStore = new LazyStore("settings.json");
+let initialization: Promise<void> | undefined;
+let settingsLoaded = false;
+let pendingSettings: Partial<VibeSettings> = {};
+let saveQueue = Promise.resolve();
+
+function saveSettings(settings: VibeSettings): Promise<void> {
+  saveQueue = saveQueue.then(async () => {
+    try {
+      await settingsStore.set("settings", settings);
+      await settingsStore.save();
+      useVibeStore.setState({ settingsError: null });
+    } catch {
+      useVibeStore.setState({
+        settingsError: "Preferences could not be saved. Your changes are still here. Retry saving.",
+      });
+    }
+  });
+  return saveQueue;
+}
 
 interface VibeState {
   // Initialization
   initialize: () => Promise<void>;
+  settingsLoading: boolean;
+  settingsError: string | null;
 
   // Settings
   settings: VibeSettings;
@@ -63,30 +85,52 @@ const DEFAULT_SETTINGS: VibeSettings = {
 export const useVibeStore = create<VibeState>()(
   subscribeWithSelector((set, get) => ({
     // Initialization
-    initialize: async () => {
-      try {
-        const savedSettings = await settingsStore.get<VibeSettings>("settings");
-        if (savedSettings) {
-          // Merge with default to ensure new keys exist
-          set({ settings: { ...DEFAULT_SETTINGS, ...savedSettings } });
-        }
-      } catch (e) {
-        console.warn("Failed to load settings:", e);
-      }
+    settingsLoading: false,
+    settingsError: null,
+    initialize: () => {
+      if (initialization) return initialization;
+      // Web preview deliberately keeps preferences in memory only.
+      if (!isTauri()) return Promise.resolve();
+      if (settingsLoaded && !get().settingsError) return Promise.resolve();
 
-      // Auto-save subscription
-      useVibeStore.subscribe(
-        (state) => state.settings,
-        (settings) => {
-          settingsStore.set("settings", settings);
-          settingsStore.save();
+      set({ settingsLoading: true });
+      initialization = (async () => {
+        try {
+          if (settingsLoaded) {
+            await saveSettings(get().settings);
+            return;
+          }
+          const invoke = await tauriInvoke();
+          // The native command rejects unreadable/corrupt files before the
+          // plugin can register an empty store and overwrite them on exit.
+          const savedSettings = await invoke<Partial<VibeSettings> | null>("load_settings");
+          const edited = Object.keys(pendingSettings).length > 0;
+          const settings = { ...DEFAULT_SETTINGS, ...savedSettings, ...pendingSettings };
+          pendingSettings = {};
+          settingsLoaded = true;
+          set({ settings, settingsError: null });
+          if (edited) await saveSettings(settings);
+        } catch {
+          set({
+            settingsError:
+              "Preferences could not be loaded. Your changes are kept for this session only. Retry to recover and save them.",
+          });
+        } finally {
+          set({ settingsLoading: false });
+          initialization = undefined;
         }
-      );
+      })();
+      return initialization;
     },
 
     // Settings
     settings: DEFAULT_SETTINGS,
-    updateSettings: (partial) => set((state) => ({ settings: { ...state.settings, ...partial } })),
+    updateSettings: (partial) => {
+      const settings = { ...get().settings, ...partial };
+      set({ settings });
+      if (settingsLoaded) void saveSettings(settings);
+      else pendingSettings = { ...pendingSettings, ...partial };
+    },
 
     // Playlist
     playlist: [],
