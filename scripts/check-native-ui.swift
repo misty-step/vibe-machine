@@ -1,5 +1,6 @@
 import AppKit
 import CoreGraphics
+import CoreImage
 import Darwin
 import Vision
 
@@ -53,7 +54,18 @@ if CommandLine.arguments.count == 5 {
     let expected = CommandLine.arguments[4].lowercased()
     let request = VNRecognizeTextRequest()
     request.recognitionLevel = .accurate
-    try VNImageRequestHandler(url: url).perform([request])
+    request.minimumTextHeight = 0
+    request.recognitionLanguages = ["en-US"]
+    request.usesLanguageCorrection = false
+    // Native controls include 9px, muted labels. Normalize this same screenshot
+    // for OCR without altering the saved evidence or the normalized coordinates.
+    let ocrImage = CIImage(contentsOf: url)!
+        .applyingFilter("CIExposureAdjust", parameters: [kCIInputEVKey: 2.0])
+        .applyingFilter("CILanczosScaleTransform", parameters: [kCIInputScaleKey: 3.0,
+                                                             kCIInputAspectRatioKey: 1.0])
+    let extent = CGRect(x: 0, y: 0, width: CGFloat(image.pixelsWide) * 3, height: CGFloat(image.pixelsHigh) * 3)
+    let normalized = CIContext().createCGImage(ocrImage, from: extent)!
+    try VNImageRequestHandler(cgImage: normalized, options: [:]).perform([request])
     let observations = request.results ?? []
     if action == "contains" {
         let text = observations.compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ").lowercased()
@@ -67,12 +79,21 @@ if CommandLine.arguments.count == 5 {
             exit(1)
         }
         let labels = observations.compactMap { $0.topCandidates(1).first }
-        let label = labels.first { $0.string.lowercased() == expected }
-            ?? labels.first { $0.string.lowercased().contains(expected) }
-        guard let label = label,
-              let range = label.string.range(of: expected, options: .caseInsensitive),
-              let box = try label.boundingBox(for: range) else {
-            FileHandle.standardError.write(Data("Native recovery control was not visible\n".utf8))
+        let matches = labels.filter { $0.string.lowercased() == expected }
+        guard matches.count == 1 else {
+            FileHandle.standardError.write(Data("Native recovery control was missing or ambiguous\n".utf8))
+            exit(1)
+        }
+        let label = matches[0]
+        guard let box = try label.boundingBox(for: label.string.startIndex..<label.string.endIndex) else {
+            FileHandle.standardError.write(Data("Native recovery control had no bounding box\n".utf8))
+            exit(1)
+        }
+        let target = box.boundingBox
+        guard [target.minX, target.minY, target.maxX, target.maxY].allSatisfy({ $0.isFinite }),
+              target.width > 0, target.height > 0,
+              target.minX >= 0, target.minY >= 0, target.maxX <= 1, target.maxY <= 1 else {
+            FileHandle.standardError.write(Data("Native recovery control had invalid bounds\n".utf8))
             exit(1)
         }
         let pid = Int(CommandLine.arguments[2])!
@@ -81,8 +102,8 @@ if CommandLine.arguments.count == 5 {
             ($0[kCGWindowOwnerPID as String] as? Int) == pid && ($0[kCGWindowLayer as String] as? Int) == 0
         }!
         let bounds = CGRect(dictionaryRepresentation: window[kCGWindowBounds as String] as! CFDictionary)!
-        let point = CGPoint(x: bounds.minX + box.boundingBox.midX * bounds.width,
-                            y: bounds.minY + (1 - box.boundingBox.midY) * bounds.height)
+        let point = CGPoint(x: bounds.minX + target.midX * bounds.width,
+                            y: bounds.minY + (1 - target.midY) * bounds.height)
         for type in [CGEventType.leftMouseDown, CGEventType.leftMouseUp] {
             CGEvent(mouseEventSource: nil, mouseType: type, mouseCursorPosition: point, mouseButton: .left)!.post(tap: .cghidEventTap)
         }
