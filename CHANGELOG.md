@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.6.1](https://github.com/misty-step/vibe-machine/compare/v1.6.0...v1.6.1) (2026-10-23)
+
+
+### Bug Fixes
+
+* **deps:** patch high Dependabot advisories ([#227](https://github.com/misty-step/vibe-machine/issues/227)) ([45d6be1](https://github.com/misty-step/vibe-machine/commit/45d6be1b2b1ba84f9071e769818cefacff29336a))
+* **settings:** preserve unread preferences and recover session edits ([#231](https://github.com/misty-step/vibe-machine/issues/231)) ([fc34b7c](https://github.com/misty-step/vibe-machine/commit/fc34b7cc38113fc22af7102f663078b1bff47718))
+
 ## [1.6.0](https://github.com/misty-step/vibe-machine/compare/v1.5.0...v1.6.0) (2026-10-16)
 
 
