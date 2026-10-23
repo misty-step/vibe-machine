@@ -38,3 +38,4 @@ base64 = "0.22"
 tempfile = "3"
 
 [dev-dependencies]
+tauri = { version = "2.9.5", features = ["test"] }

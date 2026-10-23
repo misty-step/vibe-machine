@@ -22,7 +22,7 @@ evidence.mkdir()
 home = root / "home"
 settings = home / "Library/Application Support/com.mistystep.vibemachine/settings.json"
 settings.parent.mkdir(parents=True)
-fixture = {"settings": {"visualizerColor": "#06b6d4", "showTitle": False}}
+fixture = {"settings": {"visualizerColor": "#06b6d4", "showTitle": False}, "unknown": {"keep": "synthetic"}}
 settings.write_text(json.dumps(fixture))
 
 release = json.loads(run("gh", "api", "repos/{owner}/{repo}/releases/latest"))
@@ -64,6 +64,59 @@ for label, image, expected in [
     assert json.loads(settings.read_text()) == fixture, f"{label} changed accepted settings"
     print(f"{label}: native bundle {expected} launched; settings preserved", flush=True)
 
+    if label in ("prior", "candidate"):
+        original = settings.read_bytes()
+        corrupt = b'{"settings": invalid-synthetic-fixture'
+        settings.write_bytes(corrupt)
+        process = None
+        try:
+            with (evidence / f"{label}-settings-recovery.log").open("w") as log:
+                process = subprocess.Popen([str(executable)], env={**os.environ, "HOME": str(home)}, stdout=log, stderr=log)
+                time.sleep(7)
+                assert process.poll() is None, f"{label} recovery launch exited"
+                if label == "candidate":
+                    run("swift", "scripts/check-native-ui.swift", str(evidence / "settings-load-error.png"), str(process.pid), "contains", "Preferences could not be loaded")
+                # Request an ordinary application quit, not SIGTERM: this must
+                # exercise the native store plugin's save-on-exit behavior.
+                run("swift", "scripts/check-native-ui.swift", "quit", str(process.pid))
+                process.wait(timeout=10)
+            preserved = settings.read_bytes() == corrupt
+            (evidence / f"{label}-corruption-result.json").write_text(json.dumps({"corrupt_file_preserved_after_native_exit": preserved}))
+            if label == "candidate":
+                assert preserved, "Candidate overwrote unread preferences on native exit"
+            print(f"{label}: corrupt settings preserved after native exit = {preserved}", flush=True)
+
+            if label == "candidate":
+                settings.write_bytes(corrupt)
+                with (evidence / "candidate-settings-retry.log").open("w") as log:
+                    process = subprocess.Popen([str(executable)], env={**os.environ, "HOME": str(home)}, stdout=log, stderr=log)
+                    time.sleep(7)
+                    assert process.poll() is None, "Candidate retry launch exited"
+                    run("swift", "scripts/check-native-ui.swift", str(evidence / "settings-style-tab.png"), str(process.pid), "click", "style")
+                    time.sleep(1)
+                    run("swift", "scripts/check-native-ui.swift", str(evidence / "settings-session-edit.png"), str(process.pid), "click", "Orbital")
+                    time.sleep(1)
+                    assert settings.read_bytes() == corrupt, "Session edit overwrote unread preferences"
+                    settings.write_bytes(original)
+                    run("swift", "scripts/check-native-ui.swift", str(evidence / "settings-retry.png"), str(process.pid), "click", "Retry preferences")
+                    time.sleep(2)
+                    recovered = json.loads(settings.read_text())
+                    assert recovered["settings"]["visualizerColor"] == fixture["settings"]["visualizerColor"]
+                    assert recovered["settings"]["showTitle"] is False
+                    assert recovered["settings"]["visualizerMode"] == "Orbital"
+                    assert recovered["unknown"] == fixture["unknown"]
+                    run("swift", "scripts/check-native-ui.swift", str(evidence / "settings-recovered.png"), str(process.pid))
+                    run("swift", "scripts/check-native-ui.swift", "quit", str(process.pid))
+                    process.wait(timeout=10)
+                    assert json.loads(settings.read_text()) == recovered
+                    print("Installed candidate: explicit retry preserved saved values, session edit, and unknown keys through native exit", flush=True)
+        finally:
+            if process is not None and process.poll() is None:
+                process.terminate()
+                process.wait(timeout=10)
+            # This path is exclusively the disposable HOME created above.
+            settings.write_bytes(original)
+
     if label == "candidate":
         ffmpeg, = [p for p in installed.rglob("ffmpeg*") if p.is_file() and os.access(p, os.X_OK)]
         run("lipo", str(ffmpeg), "-verify_arch", "arm64")
@@ -72,3 +125,4 @@ for label, image, expected in [
         run(str(ffmpeg), "-v", "error", "-i", str(video), "-f", "null", "-")
         assert video.stat().st_size > 0
         print("Installed ARM sidecar: real H.264/AAC encode and decode passed", flush=True)
+

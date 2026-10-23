@@ -8,7 +8,12 @@
 - With no media selected, the application presents its idle state. A user can
   choose local audio and an image, configure the visualization and export video.
 - Saved preferences survive application replacement and a compatible rollback.
-  Installation replaces the application, not the user's settings.
+  Installation replaces the application, not the user's settings. An unreadable
+  or invalid existing settings file is never treated as empty or overwritten.
+  Loading and saving failures are visible. Changes made while loading is
+  unavailable stay in the current session; an explicit retry recovers saved
+  preferences and applies only those session edits. A failed save can be retried
+  without discarding the current changes.
 - A user can find the recommended download through GitHub Releases and the
   Homebrew install command on the public site. A known-broken release is not
   recommended; the previous working download remains available during repair.

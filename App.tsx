@@ -39,6 +39,8 @@ const App: React.FC = () => {
   const setBackgroundImage = useVibeStore((s) => s.setBackgroundImage);
   const setBackgroundImagePath = useVibeStore((s) => s.setBackgroundImagePath);
   const initializeStore = useVibeStore((s) => s.initialize);
+  const settingsError = useVibeStore((s) => s.settingsError);
+  const settingsLoading = useVibeStore((s) => s.settingsLoading);
 
   // Export state from store (single source of truth)
   const isExporting = useVibeStore((s) => s.isExporting);
@@ -171,6 +173,23 @@ const App: React.FC = () => {
           </button>
         </div>
       </header>
+
+      {settingsError && (
+        <div
+          role="alert"
+          className="flex items-center gap-3 bg-carbon px-4 py-2 text-sm text-amber-200"
+        >
+          <span>{settingsError}</span>
+          <button
+            type="button"
+            disabled={settingsLoading}
+            onClick={() => void initializeStore()}
+            className="shrink-0 rounded border border-amber-200 px-2 py-1 disabled:opacity-50"
+          >
+            {settingsLoading ? "Retrying…" : "Retry preferences"}
+          </button>
+        </div>
+      )}
 
       {/* Main Workspace */}
       <div className="flex flex-1 overflow-hidden relative bg-grid-pattern bg-grid">

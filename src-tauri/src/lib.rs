@@ -1,6 +1,7 @@
 mod export_video;
 mod export_frame;
 mod path_guard;
+mod settings;
 
 use export_video::export_video;
 
@@ -11,7 +12,7 @@ pub fn run() {
     .plugin(tauri_plugin_dialog::init())
     .plugin(tauri_plugin_shell::init()) // Init shell plugin
     .plugin(tauri_plugin_log::Builder::default().level(log::LevelFilter::Info).build())
-    .invoke_handler(tauri::generate_handler![export_video])
+    .invoke_handler(tauri::generate_handler![export_video, settings::load_settings])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
 }
