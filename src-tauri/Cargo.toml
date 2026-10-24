@@ -34,7 +34,7 @@ tauri-plugin-store = "2.4.2"
 tauri-plugin-dialog = "2"
 reqwest = { version = "0.12.28", features = ["blocking", "rustls-tls"] }
 zip = "8.6.0"
-base64 = "0.22"
+base64 = "0.23"
 tempfile = "3"
 
 [dev-dependencies]
