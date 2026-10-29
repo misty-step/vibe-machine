@@ -27,13 +27,15 @@ concurrency:
 jobs:
   release-please:
     if: (github.event_name == 'workflow_dispatch' && !inputs.approve_only) || (github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'master' && github.event.workflow_run.conclusion == 'success')
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, hetzner-ci, vibe-machine-ci]
     outputs:
       release_created: ${{ steps.release.outputs.release_created || steps.resume.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name || steps.resume.outputs.tag_name }}
       sha: ${{ steps.release.outputs.sha || steps.resume.outputs.sha }}
       release_id: ${{ steps.release.outputs.id || steps.resume.outputs.id }}
     steps:
+      - name: Install GitHub CLI
+        run: sudo apt-get update && sudo apt-get install -y gh
       - uses: actions/github-script@v7
         name: Require green CI on the current source
         with:
@@ -115,7 +117,7 @@ jobs:
 
   approve-release-ci:
     if: inputs.approve_only || github.event.workflow_run.event == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, hetzner-ci, vibe-machine-ci]
     steps:
       - uses: actions/github-script@v7
         name: Approve native release PR CI, including delayed or unchanged runs

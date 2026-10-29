@@ -9,7 +9,7 @@ on:
 
 jobs:
   quality:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, hetzner-ci, vibe-machine-ci]
     steps:
       - name: Validate release-note title
         if: github.event_name == 'pull_request'
@@ -36,6 +36,11 @@ jobs:
       - name: Build application
         run: pnpm build
 
+      - name: Install Chrome for built application acceptance
+        run: |
+          curl -fsSL https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -o "$RUNNER_TEMP/google-chrome.deb"
+          sudo apt-get update
+          sudo apt-get install -y "$RUNNER_TEMP/google-chrome.deb"
       - name: Exercise the compiled application in a real browser
         timeout-minutes: 2
         run: node scripts/smoke-app.mjs
@@ -78,7 +83,7 @@ jobs:
           retention-days: 14
 
   rust:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, hetzner-ci, vibe-machine-ci]
     steps:
       - uses: actions/checkout@v4
 
@@ -107,7 +112,7 @@ jobs:
 
   merge-gate:
     name: merge-gate
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, hetzner-ci, vibe-machine-ci]
     needs: [quality, rust]
     if: always()
     steps:
@@ -120,11 +125,13 @@ jobs:
   deploy-site:
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     needs: [quality, rust]
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, hetzner-ci, vibe-machine-ci]
     concurrency:
       group: site-production
       cancel-in-progress: false
     steps:
+      - name: Install GitHub CLI
+        run: sudo apt-get update && sudo apt-get install -y gh
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4

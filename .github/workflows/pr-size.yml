@@ -6,7 +6,7 @@ on:
 
 jobs:
   size:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, hetzner-ci, vibe-machine-ci]
     permissions:
       pull-requests: write
     steps:
